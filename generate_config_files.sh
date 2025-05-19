@@ -23,6 +23,7 @@ echo "DataDir=${RUN_DIR}/ndb_mgmd/data" >> config.ini
 
 echo >> config.ini
 global_node_id=0
+location_domain_id=0
 for ((i=1; i<=NDBMTD_NUMS; i++)); do
   echo "[NDBD]" >> config.ini
   node_ip="NDBMTD_PRI_$i"
@@ -33,6 +34,11 @@ for ((i=1; i<=NDBMTD_NUMS; i++)); do
   echo "DataDir=${RUN_DIR}/ndbmtd/data" >> config.ini
   echo "FileSystemPath=${RUN_DIR}/ndbmtd/ndb_data" >> config.ini
   echo "FileSystemPathDD=${RUN_DIR}/ndbmtd/ndb_disk_columns" >> config.ini
+  echo "LocationDomainId=${location_domain_id}
+  location_domain_id=$((location_domain_id + 1))
+  if test "x${location_domain_id} = "x${NUM_AZS} ; then
+    location_domain_id=0
+  fi
 done
 
 echo >> config.ini
@@ -43,6 +49,11 @@ for ((i=1; i<=MYSQLD_NUMS; i++)); do
   nodeid=$((global_node_id + 1))
   echo "NodeId=${nodeid}" >> config.ini
   global_node_id=$nodeid
+  echo "LocationDomainId=${location_domain_id}
+  location_domain_id=$((location_domain_id + 1))
+  if test "x${location_domain_id} = "x${NUM_AZS} ; then
+    location_domain_id=0
+  fi
 done
 
 echo >> config.ini
@@ -57,7 +68,12 @@ for ((i=1; i<=RDRS_NUMS; i++)); do
     nodeid=$((global_node_id + 1))
     echo "NodeId=${nodeid}" >> config.ini
     global_node_id=$nodeid
+    echo "LocationDomainId=${location_domain_id}
   done
+  location_domain_id=$((location_domain_id + 1))
+  if test "x${location_domain_id} = "x${NUM_AZS} ; then
+    location_domain_id=0
+  fi
 done
 
 NUM_RESERVED_CLUSTER_CONN=10
