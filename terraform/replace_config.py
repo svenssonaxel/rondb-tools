@@ -7,25 +7,26 @@ def format_host_block(name, pub_ips, pri_ips):
         lines.append(f"{name}_PUB_{i}={pub}")
     return "\n".join(lines)
 
-def generate_config(tf_output, ip_data, key_name="your-key-name"):
+def generate_config(tf_output, var_constants, ip_data, key_name="your-key-name"):
     template = Template("""#!/bin/bash
 USER=ubuntu
 WORKSPACE=/home/$${USER}/workspace
 RUN_DIR=$${WORKSPACE}/rondb-run
 KEY_PEM=${key_name}.pem
 
-TARBALL_NAME=rondb-24.10.1-linux-glibc2.28-x86_64.tar.gz
+TARBALL_NAME=rondb-${rondb_version}-linux-glibc2.28-${cpu_platform}.tar.gz
+NUM_AZS=${num_azs}
 
 NDB_MGMD_PRI=${ndb_mgmd_pri}
 NDB_MGMD_PUB=${ndb_mgmd_pub}
 
-NO_OF_REPLICAS=2
+NO_OF_REPLICAS=${num_replicas}
 ${ndbmtd_block}
 
 ${mysqld_block}
 
-RDRS_LB="http://${rdrs_lb}:5406"
-RONDIS_LB="${rondis_lb}"
+RDRS_LB="http://${rdrs_lb}:4406"
+RONDIS_LB="${rondis_lb}:6379"
 ${rdrs_block}
 
 ${benchmark_block}
@@ -39,6 +40,10 @@ VAL_PUB_2=$$LOC_PUB_2
 
     return template.substitute(
         key_name=key_name,
+        num_replicas=var_constants["num_replicas"],
+        cpu_platform=var_constants["cpu_platform"],
+        num_azs=var_constants["num_azs"],
+        rondb_version=var_constants["rondb_version"],
         ndb_mgmd_pri=ip_data["ndb_mgmd"]["private"],
         ndb_mgmd_pub=ip_data["ndb_mgmd"]["public"],
         ndbmtd_block=format_host_block("NDBMTD", ip_data["ndbmtd"]["public"], ip_data["ndbmtd"]["private"]),

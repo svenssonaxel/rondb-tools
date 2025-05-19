@@ -45,3 +45,19 @@ output "rdrs_nlb_dns" {
 output "rondis_nlb_dns" {
   value = aws_lb.rondis_nlb.dns_name
 }
+
+output "rondb_replicas" {
+  value = var.rondb_replicas
+}
+
+output "cpu_platform" {
+  value = var.cpu_platform
+}
+
+output "rondb_version" {
+  value = var.rondb_version
+}
+
+output "num_azs" {
+  value = var.num_azs
+}

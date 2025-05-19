@@ -34,7 +34,14 @@ ip_data = {
     }
 }
 
-config = generate_config(tf_output, ip_data, key_name=key_name_str)
+var_constants = {
+    "num_replicas" = tf_output["rondb_replicas"]["value"]
+    "cpu_platform" = tf_output["cpu_platform"]["value]
+    "num_azs" = tf_output["num_azs"]["value"]
+    "rondb_version" = tf_output["rondb_version"]["value"]
+}
+
+config = generate_config(tf_output, var_constants, ip_data, key_name=key_name_str)
 with open("config", "w") as f:
     f.write(config)
 print("config file generated")

@@ -2,13 +2,20 @@ variable "region" {
   default = "eu-north-1"
 }
 
-variable "use_multiple_azs" {
-  type    = bool
-  default = false
+variable "rondb_replicas" {
+  default = 2
+}
+
+variable "rondb_version" {
+  default = "24.10.1"
+}
+
+variable "cpu_platform" {
+  default = "x86_64"
 }
 
 variable "num_azs" {
-  default = 3
+  default = 1
 }
 
 variable "ami_id" {
