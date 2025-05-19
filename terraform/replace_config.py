@@ -11,10 +11,10 @@ def generate_config(tf_output, ip_data, key_name="your-key-name"):
     template = Template("""#!/bin/bash
 USER=ubuntu
 WORKSPACE=/home/$${USER}/workspace
-RUN_DIR=$${WORKSPACE}/rondb-run/
+RUN_DIR=$${WORKSPACE}/rondb-run
 KEY_PEM=${key_name}.pem
 
-TARBALL_NAME=rondb-24.10.0-linux-glibc2.28-x86_64.tar.gz
+TARBALL_NAME=rondb-24.10.1-linux-glibc2.28-x86_64.tar.gz
 
 NDB_MGMD_PRI=${ndb_mgmd_pri}
 NDB_MGMD_PUB=${ndb_mgmd_pub}
@@ -24,7 +24,7 @@ ${ndbmtd_block}
 
 ${mysqld_block}
 
-RDRS_LB="http://${rdrs_lb}"
+RDRS_LB="http://${rdrs_lb}:5406"
 RONDIS_LB="${rondis_lb}"
 ${rdrs_block}
 
@@ -45,7 +45,7 @@ VAL_PUB_2=$$LOC_PUB_2
         mysqld_block=format_host_block("MYSQLD", ip_data["mysqld"]["public"], ip_data["mysqld"]["private"]),
         rdrs_block=format_host_block("RDRS", ip_data["rdrs"]["public"], ip_data["rdrs"]["private"]),
         benchmark_block=format_host_block("LOC", ip_data["benchmark"]["public"], ip_data["benchmark"]["private"]),
-        rdrs_lb=tf_output["rdrs_alb_dns"]["value"],
+        rdrs_lb=tf_output["rdrs_nlb_dns"]["value"],
         rondis_lb=tf_output["rondis_nlb_dns"]["value"]
     )
 

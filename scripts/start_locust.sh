@@ -15,8 +15,8 @@ WORKERS=$2;
 source ${RUN_DIR}/locust/bin/activate
 
 if [ ${START_MASTER} -eq 1 ]; then
-  echo "taskset -c 0 locust -f ./scripts/locust_batch_read.py --host=${RDRS_HOST} --table-size=10000 --batch-size=100 --master"
-  taskset -c 0 locust -f ./scripts/locust_batch_read.py --host=${RDRS_HOST} --table-size=10000 --batch-size=100 --master &
+  echo "taskset -c 0 locust -f ./scripts/locust_batch_read.py --host=${RDRS_HOST} --table-size=100000 --batch-size=100 --master"
+  taskset -c 0 locust -f ./scripts/locust_batch_read.py --host=${RDRS_HOST} --table-size=100000 --batch-size=100 --master &
   sleep 2
   for ((i=1; i<=${WORKERS}; i++)); do
     echo "taskset -c ${i} locust -f ./scripts/locust_batch_read.py --worker --master-host=${LOC_PRI_1}"

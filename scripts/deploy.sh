@@ -55,7 +55,7 @@ if [ $can_skip_tarball -eq 0 ]; then
   rm -rf ${WORKSPACE}
   mkdir -p ${WORKSPACE}
   cd ${WORKSPACE}
-  wget $TARBALL_SOURCE
+  wget --retry-connrefused --retry-on-host-error --waitretry=10 -t 10 $TARBALL_SOURCE
   tar xvf ${TARBALL_NAME}
   ln -s ${TARBALL} rondb
 elif [ $can_skip_tarball ] && [ $skip -eq $SKIP_FETCH_TARBALL_AND_ENV ]; then
@@ -82,6 +82,8 @@ case "$2" in
   rdrs)
     rm -rf ${RUN_DIR}
     mkdir -p ${RUN_DIR}/rdrs
+    sudo apt update
+    sudo apt install libjsoncpp-dev -y
     ;;
   locust)
     rm -rf ${RUN_DIR}

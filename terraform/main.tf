@@ -91,6 +91,11 @@ resource "aws_instance" "ndbmtd" {
   vpc_security_group_ids = [aws_security_group.allow_all.id]
   key_name               = var.key_name
 
+  root_block_device {
+    volume_size = var.ndbmtd_disk_size
+    volume_type = "gp3"
+  }
+
   tags = {
     Name = "ndbmtd_${count.index + 1}"
   }
@@ -104,6 +109,11 @@ resource "aws_instance" "mysqld" {
   associate_public_ip_address = true
   vpc_security_group_ids = [aws_security_group.allow_all.id]
   key_name               = var.key_name
+
+  root_block_device {
+    volume_size = var.mysqld_disk_size
+    volume_type = "gp3"
+  }
 
   tags = {
     Name = "mysqld_${count.index + 1}"
@@ -119,6 +129,11 @@ resource "aws_instance" "rdrs" {
   vpc_security_group_ids = [aws_security_group.allow_all.id]
   key_name               = var.key_name
 
+  root_block_device {
+    volume_size = var.rdrs_disk_size
+    volume_type = "gp3"
+  }
+
   tags = {
     Name = "rdrs_${count.index + 1}"
   }
@@ -133,6 +148,11 @@ resource "aws_instance" "benchmark" {
   vpc_security_group_ids = [aws_security_group.allow_all.id]
   key_name               = var.key_name
 
+  root_block_device {
+    volume_size = var.benchmark_disk_size
+    volume_type = "gp3"
+  }
+
   tags = {
     Name = "benchmark_${count.index + 1}"
   }
@@ -142,18 +162,17 @@ locals {
   rdrs_private_ips = [for instance in aws_instance.rdrs : instance.private_ip]
 }
 
-resource "aws_lb" "rdrs_alb" {
+resource "aws_lb" "rdrs_nlb" {
   name               = "rdrs-lbs"
   internal           = true
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.allow_all.id]
+  load_balancer_type = "network"
   subnets            = [aws_subnet.main.id, aws_subnet.subnet_b.id]
 }
 
 resource "aws_lb_target_group" "rdrs_tg" {
   name        = "rdrs-targets"
   port        = 5406
-  protocol    = "HTTP"
+  protocol    = "TCP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
 }
@@ -166,9 +185,9 @@ resource "aws_lb_target_group_attachment" "rdrs_tg_attachments" {
 }
 
 resource "aws_lb_listener" "rdrs_listener" {
-  load_balancer_arn = aws_lb.rdrs_alb.arn
-  port              = 80
-  protocol          = "HTTP"
+  load_balancer_arn = aws_lb.rdrs_nlb.arn
+  port              = 5406
+  protocol          = "TCP"
 
   default_action {
     type             = "forward"

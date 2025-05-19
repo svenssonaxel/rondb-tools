@@ -38,8 +38,8 @@ output "benchmark_private_ips" {
   value = [for inst in aws_instance.benchmark : inst.private_ip]
 }
 
-output "rdrs_alb_dns" {
-  value = aws_lb.rdrs_alb.dns_name
+output "rdrs_nlb_dns" {
+  value = aws_lb.rdrs_nlb.dns_name
 }
 
 output "rondis_nlb_dns" {

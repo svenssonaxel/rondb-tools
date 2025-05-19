@@ -25,8 +25,8 @@ for ((i=1; i<=LOC_NUMS; i++)); do
   echo "locust [$i]     -> ${!node_pri_ip} / ${!node_pub_ip}"
 done
 for ((i=1; i<=VALKEY_NUMS; i++)); do
-  node_pri_ip="VAL_PRI_$i"
-  node_pub_ip="VAL_PUB_$i"
+  node_pri_ip="LOC_PRI_$i"
+  node_pub_ip="LOC_PUB_$i"
   echo "valkey [$i]     -> ${!node_pri_ip} / ${!node_pub_ip}"
 done
 echo "--------------------------------------------------"
@@ -60,17 +60,20 @@ if [ $# -eq 1 ]; then
 fi
 
 # 1. ndb_mgmd
+echo "Deploy ndb_mgmd"
 #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r ./scripts ${USER}@${NDB_MGMD_PUB}:~
 #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r config ${USER}@${NDB_MGMD_PUB}:~/scripts/config
 #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r ./config_files ${USER}@${NDB_MGMD_PUB}:~
 rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./scripts ${USER}@${NDB_MGMD_PUB}:~
 rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config ${USER}@${NDB_MGMD_PUB}:~/scripts/config
 rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config_files ${USER}@${NDB_MGMD_PUB}:~
-ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${NDB_MGMD_PUB} "bash ~/scripts/deploy.sh ${TARBALL_NAME} ndb_mgmd ${skip}" &
+echo "rsync done"
+ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${NDB_MGMD_PUB} "bash ~/scripts/deploy.sh ${TARBALL_NAME} ndb_mgmd ${skip}"
 
 # 2. ndbmtd
 for ((i=1; i<=NDBMTD_NUMS; i++)); do
   node_ip="NDBMTD_PUB_$i"
+  echo "Deploy ndbmtd $i"
 
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r ./scripts ${USER}@${!node_ip}:~
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r config ${USER}@${!node_ip}:~/scripts/config
@@ -78,12 +81,14 @@ for ((i=1; i<=NDBMTD_NUMS; i++)); do
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./scripts ${USER}@${!node_ip}:~
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config ${USER}@${!node_ip}:~/scripts/config
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config_files ${USER}@${!node_ip}:~
-  ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} ndbmtd ${skip}" &
+  echo "rsync done"
+  ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} ndbmtd ${skip}"
 done
 
 # 3. mysqld
 for ((i=1; i<=MYSQLD_NUMS; i++)); do
   node_ip="MYSQLD_PUB_$i"
+  echo "Deploy mysqld $i"
 
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r ./scripts ${USER}@${!node_ip}:~
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r config ${USER}@${!node_ip}:~/scripts/config
@@ -91,12 +96,14 @@ for ((i=1; i<=MYSQLD_NUMS; i++)); do
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./scripts ${USER}@${!node_ip}:~
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config ${USER}@${!node_ip}:~/scripts/config
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config_files ${USER}@${!node_ip}:~
-  ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} mysqld ${skip}" &
+  echo "rsync done"
+  ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} mysqld ${skip}"
 done
 
 # 4. rdrs
 for ((i=1; i<=RDRS_NUMS; i++)); do
   node_ip="RDRS_PUB_$i"
+  echo "Deploy RDRS $i"
 
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r ./scripts ${USER}@${!node_ip}:~
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r config ${USER}@${!node_ip}:~/scripts/config
@@ -104,12 +111,14 @@ for ((i=1; i<=RDRS_NUMS; i++)); do
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./scripts ${USER}@${!node_ip}:~
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config ${USER}@${!node_ip}:~/scripts/config
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config_files ${USER}@${!node_ip}:~
-  ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} rdrs ${skip}" &
+  echo "rsync done"
+  ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} rdrs ${skip}"
 done
 
 # 5. locust
 for ((i=1; i<=LOC_NUMS; i++)); do
   node_ip="LOC_PUB_$i"
+  echo "Deploy Locust $i"
 
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r ./scripts ${USER}@${!node_ip}:~
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r config ${USER}@${!node_ip}:~/scripts/config
@@ -117,14 +126,16 @@ for ((i=1; i<=LOC_NUMS; i++)); do
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./scripts ${USER}@${!node_ip}:~
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config ${USER}@${!node_ip}:~/scripts/config
   rsync -avz --delete -e "ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no" ./config_files ${USER}@${!node_ip}:~
-  ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} locust ${skip}" &
+  echo "rsync done"
+  ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} locust ${skip}"
 done
 
 wait # in case of any conflicts on apt install if the valkey stays with the locust.
 
 # 6. valkey
 for ((i=1; i<=VALKEY_NUMS; i++)); do
-  node_ip="VAL_PUB_$i"
+  node_ip="LOC_PUB_$i"
+  echo "Deploy valkey $i"
 
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r ./scripts ${USER}@${!node_ip}:~
   #scp -i ${KEY_PEM} -o StrictHostKeyChecking=no -r config ${USER}@${!node_ip}:~/scripts/config
@@ -137,7 +148,7 @@ for ((i=1; i<=VALKEY_NUMS; i++)); do
   if [ $skip -eq $NO_SKIP ] && [ "${!node_ip}" == "${!locust_ip}" ]; then
     t_skip=$SKIP_FETCH_TARBALL
   fi
-
+  echo "rsync done"
   ssh -i ${KEY_PEM} -o StrictHostKeyChecking=no ${USER}@${!node_ip} "bash ~/scripts/deploy.sh ${TARBALL_NAME} valkey ${t_skip}" &
 done
 

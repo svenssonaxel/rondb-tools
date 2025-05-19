@@ -1,4 +1,8 @@
 {
+  "REST": {
+    "NumThreads": 64,
+    "UseCompression": false
+  },
 "RonDB": {
     "#": "An array of ndb_mgmd servers in use by the cluster.",
     "Mgmds": [

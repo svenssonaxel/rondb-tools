@@ -10,10 +10,11 @@ cd ./config_files
 echo "[NDBD DEFAULT]" > config.ini
 echo "AutomaticThreadConfig=true" >> config.ini
 echo "AutomaticMemoryConfig=true" >> config.ini
-echo "MaxDMLOperationsPerTransaction=1000000" >> config.ini
-echo "MaxNoOfConcurrentOperations=1000000" >> config.ini
+echo "MaxDMLOperationsPerTransaction=100000" >> config.ini
+echo "MaxNoOfConcurrentOperations=100000" >> config.ini
 echo >> config.ini
 echo "NoOfReplicas=${NO_OF_REPLICAS}" >> config.ini
+echo "PartitionsPerNode=4" >> config.ini
 
 echo >> config.ini
 echo "[NDB_MGMD]" >> config.ini

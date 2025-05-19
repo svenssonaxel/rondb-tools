@@ -3,7 +3,7 @@ variable "region" {
 }
 
 variable "ami_id" {
-  default = "ami-0c1ac8a41498c1a9c"
+  default = "ami-09fdd0b7882a4ec7b"
 }
 
 variable "key_name" {
@@ -22,11 +22,19 @@ variable "ndbmtd_instance_type" {
   default = "t3.xlarge"
 }
 
+variable "ndbmtd_disk_size" {
+  default = 200
+}
+
 variable "mysqld_count" {
   default = 2
 }
 variable "mysqld_instance_type" {
   default = "t3.xlarge"
+}
+
+variable "mysqld_disk_size" {
+  default = 60
 }
 
 variable "rdrs_count" {
@@ -36,9 +44,17 @@ variable "rdrs_instance_type" {
   default = "t3.xlarge"
 }
 
+variable "rdrs_disk_size" {
+  default = 60
+}
+
 variable "benchmark_count" {
   default = 2
 }
 variable "benchmark_instance_type" {
   default = "t3.xlarge"
+}
+
+variable "benchmark_disk_size" {
+  default = 60
 }
