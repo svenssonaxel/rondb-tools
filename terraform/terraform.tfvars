@@ -1,4 +1,4 @@
-key_name = "mikaelarm"
+key_name = "REPLACE_ME_with_the_key_name_(without .pem extension)_of_your_XXX.pem file"
 region = "eu-north-1"
 
 # ami_id is the OS image, different based on region and HW
