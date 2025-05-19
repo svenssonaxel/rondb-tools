@@ -16,7 +16,7 @@ data "aws_availability_zones" "available" {}
 
 # Subnets
 resource "aws_subnet" "subnet" {
-  count             = var.use_multiple_azs ? 3 : 1
+  count             = var.use_multiple_azs ? var.num_azs : 1
   vpc_id            = aws_vpc.main.id
   cidr_block        = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
   availability_zone = data.aws_availability_zones.available.names[count.index]
@@ -75,9 +75,10 @@ resource "aws_security_group" "allow_all" {
 }
 
 resource "aws_instance" "ndb_mgmd" {
+  count                  = 1
   ami                    = var.ami_id
   instance_type          = var.ndb_mgmd_instance_type
-  subnet_id              = aws_subnet.subnet_a.id
+  subnet_id              = local.selected_subnets[count.index % length(local.selected_subnets)]
   associate_public_ip_address = true
   vpc_security_group_ids = [aws_security_group.allow_all.id]
   key_name               = var.key_name
@@ -183,9 +184,9 @@ resource "aws_lb_target_group" "rdrs_tg" {
 }
 
 resource "aws_lb_target_group_attachment" "rdrs_tg_attachments" {
-  count             = var.rdrs_count
+  for_each = { for idx, inst in aws_instance.rdrs : idx => inst }
   target_group_arn  = aws_lb_target_group.rdrs_tg.arn
-  target_id         = aws_instance.rdrs[count.index].id
+  target_id        = each.value.private_ip
   port              = 4406
 }
 
@@ -216,9 +217,9 @@ resource "aws_lb_target_group" "rondis_tg" {
 }
 
 resource "aws_lb_target_group_attachment" "rondis_tg_attachments" {
-  count             = var.rdrs_count
+  for_each = { for idx, inst in aws_instance.rdrs : idx => inst }
   target_group_arn  = aws_lb_target_group.rondis_tg.arn
-  target_id         = aws_instance.rdrs[count.index].id
+  target_id        = each.value.private_ip
   port              = 6379
 }
 

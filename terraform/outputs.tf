@@ -1,9 +1,9 @@
 output "ndb_mgmd_public_ip" {
-  value = aws_instance.ndb_mgmd.public_ip
+  value = aws_instance.ndb_mgmd[0].public_ip
 }
 
 output "ndb_mgmd_private_ip" {
-  value = aws_instance.ndb_mgmd.private_ip
+  value = aws_instance.ndb_mgmd[0].private_ip
 }
 
 output "ndbmtd_public_ips" {

@@ -7,6 +7,10 @@ variable "use_multiple_azs" {
   default = false
 }
 
+variable "num_azs" {
+  default = 3
+}
+
 variable "ami_id" {
   default = "ami-09fdd0b7882a4ec7b"
 }
