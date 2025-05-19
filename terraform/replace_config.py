@@ -20,7 +20,7 @@ NUM_AZS=${num_azs}
 NDB_MGMD_PRI=${ndb_mgmd_pri}
 NDB_MGMD_PUB=${ndb_mgmd_pub}
 
-NO_OF_REPLICAS=${num_replicas}
+NO_OF_REPLICAS=${rondb_replicas}
 ${ndbmtd_block}
 
 ${mysqld_block}
@@ -40,7 +40,7 @@ VAL_PUB_2=$$LOC_PUB_2
 
     return template.substitute(
         key_name=key_name,
-        num_replicas=var_constants["num_replicas"],
+        rondb_replicas=var_constants["rondb_replicas"],
         cpu_platform=var_constants["cpu_platform"],
         num_azs=var_constants["num_azs"],
         rondb_version=var_constants["rondb_version"],
