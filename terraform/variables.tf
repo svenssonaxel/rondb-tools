@@ -2,6 +2,11 @@ variable "region" {
   default = "eu-north-1"
 }
 
+variable "use_multiple_azs" {
+  type    = bool
+  default = false
+}
+
 variable "ami_id" {
   default = "ami-09fdd0b7882a4ec7b"
 }

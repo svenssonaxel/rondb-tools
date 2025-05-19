@@ -5,6 +5,10 @@ region = "eu-north-1"
 # default is arm64_v8 in eu-north-1
 #ami_id = "ami-0c1ac8a41498c1a9c"
 
+# Set this variable to true if you want to set up a multi-AZ
+# installation.
+#use_multiple_azs =true
+
 ndb_mgmd_instance_type = "c8g.medium"
 ndbmtd_count = 2
 ndbmtd_instance_type = "c8g.4xlarge"
