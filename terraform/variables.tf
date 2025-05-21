@@ -10,6 +10,10 @@ variable "rondb_version" {
   default = "24.10.1"
 }
 
+variable "glibc_version" {
+  default = "2.28"
+}
+
 variable "cpu_platform" {
   default = "x86_64"
 }

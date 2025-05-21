@@ -14,7 +14,7 @@ WORKSPACE=/home/$${USER}/workspace
 RUN_DIR=$${WORKSPACE}/rondb-run
 KEY_PEM=${key_name}.pem
 
-TARBALL_NAME=rondb-${rondb_version}-linux-glibc2.28-${cpu_platform}.tar.gz
+TARBALL_NAME=rondb-${rondb_version}-linux-glibc${glibc_version}-${cpu_platform}.tar.gz
 NUM_AZS=${num_azs}
 
 NDB_MGMD_PRI=${ndb_mgmd_pri}
@@ -44,6 +44,7 @@ VAL_PUB_2=$$LOC_PUB_2
         cpu_platform=var_constants["cpu_platform"],
         num_azs=var_constants["num_azs"],
         rondb_version=var_constants["rondb_version"],
+        glibc_version=var_constants["glibc_version"],
         ndb_mgmd_pri=ip_data["ndb_mgmd"]["private"],
         ndb_mgmd_pub=ip_data["ndb_mgmd"]["public"],
         ndbmtd_block=format_host_block("NDBMTD", ip_data["ndbmtd"]["public"], ip_data["ndbmtd"]["private"]),

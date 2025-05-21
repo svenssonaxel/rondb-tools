@@ -58,6 +58,10 @@ output "rondb_version" {
   value = var.rondb_version
 }
 
+output "glibc_version" {
+  value = var.glibc_version
+}
+
 output "num_azs" {
   value = var.num_azs
 }
