@@ -1,5 +1,8 @@
-#!/bin/bash
-source ./scripts/config
+#!/usr/bin/env bash
+source ./scripts/include.sh
 
-echo "${WORKSPACE}/rondb/bin/rdrs2 -c ./config_files/rdrs2.config"
-${WORKSPACE}/rondb/bin/rdrs2 -c ./config_files/rdrs2.config > ${RUN_DIR}/rdrs/rdrs.log 2>&1 &
+before-start rdrs2
+(set -x
+ ${WORKSPACE}/rondb/bin/rdrs2  -c ./config_files/rdrs_${NODEINFO_IDX}.json \
+   > ${RUN_DIR}/rdrs/rdrs.log 2>&1 &)
+after-start rdrs2

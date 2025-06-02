@@ -47,11 +47,20 @@ resource "aws_route_table_association" "rt" {
   route_table_id = aws_route_table.rt.id
 }
 
-resource "aws_security_group" "allow_all" {
-  name        = "allow_all"
-  description = "Allow all internal traffic and all TCP from outside"
+resource "aws_security_group" "rondb_bench" {
+  name        = "rondb_bench"
+  description = "Expose ssh, grafana and locust"
   vpc_id      = aws_vpc.main.id
 
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow all internal traffic
   ingress {
     from_port   = 0
     to_port     = 0
@@ -59,30 +68,58 @@ resource "aws_security_group" "allow_all" {
     cidr_blocks = ["10.0.0.0/16"]
   }
 
+  # Expose SSH
   ingress {
-    from_port   = 0
-    to_port     = 65535
+    from_port   = 22
+    to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+  # Expose Grafana web UI
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Expose Locust web UI
+  ingress {
+    from_port   = 8089
+    to_port     = 8089
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"]
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-*-22.04-*-server-*"]
+  }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+  filter {
+    name   = "architecture"
+    values = [
+      var.cpu_platform == "arm64_v8" ? "arm64" : "x86_64"
+    ]
   }
 }
 
 resource "aws_instance" "ndb_mgmd" {
   count                  = 1
-  ami                    = var.ami_id
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.ndb_mgmd_instance_type
   subnet_id              = local.selected_subnets[count.index % length(local.selected_subnets)]
   associate_public_ip_address = true
-  vpc_security_group_ids = [aws_security_group.allow_all.id]
+  vpc_security_group_ids = [aws_security_group.rondb_bench.id]
   key_name               = var.key_name
-
   tags = {
     Name = "ndb_mgmd"
   }
@@ -90,18 +127,16 @@ resource "aws_instance" "ndb_mgmd" {
 
 resource "aws_instance" "ndbmtd" {
   count                  = var.ndbmtd_count
-  ami                    = var.ami_id
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.ndbmtd_instance_type
   subnet_id              = local.selected_subnets[count.index % length(local.selected_subnets)]
   associate_public_ip_address = true
-  vpc_security_group_ids = [aws_security_group.allow_all.id]
+  vpc_security_group_ids = [aws_security_group.rondb_bench.id]
   key_name               = var.key_name
-
   root_block_device {
     volume_size = var.ndbmtd_disk_size
     volume_type = "gp3"
   }
-
   tags = {
     Name = "ndbmtd_${count.index + 1}"
   }
@@ -109,18 +144,16 @@ resource "aws_instance" "ndbmtd" {
 
 resource "aws_instance" "mysqld" {
   count                  = var.mysqld_count
-  ami                    = var.ami_id
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.mysqld_instance_type
   subnet_id              = local.selected_subnets[count.index % length(local.selected_subnets)]
   associate_public_ip_address = true
-  vpc_security_group_ids = [aws_security_group.allow_all.id]
+  vpc_security_group_ids = [aws_security_group.rondb_bench.id]
   key_name               = var.key_name
-
   root_block_device {
     volume_size = var.mysqld_disk_size
     volume_type = "gp3"
   }
-
   tags = {
     Name = "mysqld_${count.index + 1}"
   }
@@ -128,44 +161,70 @@ resource "aws_instance" "mysqld" {
 
 resource "aws_instance" "rdrs" {
   count                  = var.rdrs_count
-  ami                    = var.ami_id
+  ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.rdrs_instance_type
   subnet_id              = local.selected_subnets[count.index % length(local.selected_subnets)]
   associate_public_ip_address = true
-  vpc_security_group_ids = [aws_security_group.allow_all.id]
+  vpc_security_group_ids = [aws_security_group.rondb_bench.id]
   key_name               = var.key_name
-
   root_block_device {
     volume_size = var.rdrs_disk_size
     volume_type = "gp3"
   }
-
   tags = {
     Name = "rdrs_${count.index + 1}"
   }
 }
 
-resource "aws_instance" "benchmark" {
-  count                  = var.benchmark_count
-  ami                    = var.ami_id
-  instance_type          = var.benchmark_instance_type
+resource "aws_instance" "prometheus" {
+  count                  = 1
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.prometheus_instance_type
   subnet_id              = local.selected_subnets[count.index % length(local.selected_subnets)]
   associate_public_ip_address = true
-  vpc_security_group_ids = [aws_security_group.allow_all.id]
+  vpc_security_group_ids = [aws_security_group.rondb_bench.id]
   key_name               = var.key_name
-
   root_block_device {
-    volume_size = var.benchmark_disk_size
+    volume_size = var.prometheus_disk_size
     volume_type = "gp3"
   }
-
   tags = {
-    Name = "benchmark_${count.index + 1}"
+    Name = "prometheus"
   }
 }
 
-locals {
-  rdrs_private_ips = [for instance in aws_instance.rdrs : instance.private_ip]
+resource "aws_instance" "grafana" {
+  count                  = 1
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.grafana_instance_type
+  subnet_id              = local.selected_subnets[count.index % length(local.selected_subnets)]
+  associate_public_ip_address = true
+  vpc_security_group_ids = [aws_security_group.rondb_bench.id]
+  key_name               = var.key_name
+  tags = {
+    Name = "grafana"
+  }
+}
+
+data "aws_ec2_instance_type" "bench_type" {
+  instance_type = aws_instance.bench[0].instance_type
+}
+
+resource "aws_instance" "bench" {
+  count                  = var.bench_count
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.bench_instance_type
+  subnet_id              = local.selected_subnets[count.index % length(local.selected_subnets)]
+  associate_public_ip_address = true
+  vpc_security_group_ids = [aws_security_group.rondb_bench.id]
+  key_name               = var.key_name
+  root_block_device {
+    volume_size = var.bench_disk_size
+    volume_type = "gp3"
+  }
+  tags = {
+    Name = "bench_${count.index + 1}"
+  }
 }
 
 resource "aws_lb" "rdrs_nlb" {

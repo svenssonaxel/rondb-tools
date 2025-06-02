@@ -1,30 +1,34 @@
-#!/bin/bash
+#!/usr/bin/env bash
+source ./scripts/include.sh
 
-if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 [start master ? 0: 1] [workers number]"
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 [workers number]"
   exit 1
 fi
-
-source ./scripts/config
-
-RDRS_HOST=${RDRS_LB:-"http://${RDRS_PRI_1}:5406"}
-
-START_MASTER=$1;
-WORKERS=$2;
+WORKERS=$1;
 
 source ${RUN_DIR}/locust/bin/activate
 
-if [ ${START_MASTER} -eq 1 ]; then
-  echo "taskset -c 0 locust -f ./scripts/locust_batch_read.py --host=${RDRS_HOST} --table-size=100000 --batch-size=100 --master"
-  taskset -c 0 locust -f ./scripts/locust_batch_read.py --host=${RDRS_HOST} --table-size=100000 --batch-size=100 --master &
+before-start locust
+if [ ${NODEINFO_IDX} -eq 1 ]; then
+  RDRS_HOST=${RDRS_LB:-"http://${RDRS_PRI_1}:5406"}
+  (set -x
+   taskset -c 0 locust -f ./scripts/locust_batch_read.py --host=${RDRS_HOST} \
+     --table-size=100000 --batch-size=100 --master \
+     > ${RUN_DIR}/locust_master.log 2>&1 &)
   sleep 2
   for ((i=1; i<=${WORKERS}; i++)); do
-    echo "taskset -c ${i} locust -f ./scripts/locust_batch_read.py --worker --master-host=${LOC_PRI_1}"
-    taskset -c ${i} locust -f ./scripts/locust_batch_read.py --worker --master-host=${LOC_PRI_1} &
+    (set -x
+     taskset -c ${i} locust -f ./scripts/locust_batch_read.py --worker \
+       --master-host=${BENCH_PRI_1} \
+       > ${RUN_DIR}/locust_worker_cpu_${i}.log 2>&1 &)
   done
 else
   for ((i=0; i<${WORKERS}; i++)); do
-    echo "taskset -c ${i} locust -f ./scripts/locust_batch_read.py --worker --master-host=${LOC_PRI_1}"
-    taskset -c ${i} locust -f ./scripts/locust_batch_read.py --worker --master-host=${LOC_PRI_1} &
+    (set -x
+     taskset -c ${i} locust -f ./scripts/locust_batch_read.py --worker \
+       --master-host=${BENCH_PRI_1} \
+       > ${RUN_DIR}/locust_worker_cpu_${i}.log 2>&1 &)
   done
 fi
+after-start locust

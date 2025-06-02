@@ -16,19 +16,20 @@ variable "glibc_version" {
 
 variable "cpu_platform" {
   default = "x86_64"
+  description = "CPU platform (x86_64 or arm64_v8)"
+  validation {
+    condition     = contains(["x86_64", "arm64_v8"], var.cpu_platform)
+    error_message = "cpu_platform must be either 'x86_64' or 'arm64_v8'"
+  }
 }
 
 variable "num_azs" {
   default = 1
 }
 
-variable "ami_id" {
-  default = "ami-09fdd0b7882a4ec7b"
-}
 
 variable "key_name" {
-  description = "SSH key pair name to use for all EC2 instances"
-  type        = string
+  default = "rondb_bench_key"
 }
 
 variable "ndb_mgmd_instance_type" {
@@ -41,10 +42,10 @@ variable "ndbmtd_count" {
 variable "ndbmtd_instance_type" {
   default = "t3.xlarge"
 }
-
 variable "ndbmtd_disk_size" {
   default = 200
 }
+
 
 variable "mysqld_count" {
   default = 2
@@ -52,10 +53,10 @@ variable "mysqld_count" {
 variable "mysqld_instance_type" {
   default = "t3.xlarge"
 }
-
 variable "mysqld_disk_size" {
   default = 60
 }
+
 
 variable "rdrs_count" {
   default = 2
@@ -63,18 +64,28 @@ variable "rdrs_count" {
 variable "rdrs_instance_type" {
   default = "t3.xlarge"
 }
-
 variable "rdrs_disk_size" {
   default = 60
 }
 
-variable "benchmark_count" {
-  default = 2
+
+variable "prometheus_instance_type" {
+  default = "t3.medium"
 }
-variable "benchmark_instance_type" {
-  default = "t3.xlarge"
+variable "prometheus_disk_size" {
+  default = 120
 }
 
-variable "benchmark_disk_size" {
+variable "grafana_instance_type" {
+  default = "t3.small"
+}
+
+variable "bench_count" {
+  default = 2
+}
+variable "bench_instance_type" {
+  default = "t3.xlarge"
+}
+variable "bench_disk_size" {
   default = 60
 }

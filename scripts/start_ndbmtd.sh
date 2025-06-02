@@ -1,11 +1,8 @@
-#!/bin/bash
-source ./scripts/config
+#!/usr/bin/env bash
+source ./scripts/include.sh
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 [node id]"
-  exit 1
-fi
-
-NODE_ID=$1
-echo "${WORKSPACE}/rondb/bin/ndbmtd --initial --ndb-nodeid=${NODE_ID} --ndb-connectstring=${NDB_MGMD_PRI}:1186"
-${WORKSPACE}/rondb/bin/ndbmtd --initial --ndb-nodeid=${NODE_ID} --ndb-connectstring=${NDB_MGMD_PRI}:1186
+before-start ndbmtd
+(set -x
+ ${WORKSPACE}/rondb/bin/ndbmtd --initial --ndb-nodeid="${NODEINFO_NODEIDS}" \
+   --ndb-connectstring=${NDB_MGMD_PRI}:1186)
+after-start ndbmtd

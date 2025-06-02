@@ -1,14 +1,19 @@
-#!/bin/bash
-source ./scripts/config
+#!/usr/bin/env bash
+source ./scripts/include.sh
 
 #1. Stop servers
-ps -ef | grep 'ndb_mgmd' | grep -v 'grep' | awk '{print $2}' | xargs -r kill -9
-ps -ef | grep 'ndbmtd' | grep -v 'grep' | awk '{print $2}' | xargs -r kill -9
-ps -ef | grep 'mysqld' | grep -v 'grep' | awk '{print $2}' | xargs -r kill -9
-ps -ef | grep 'rdrs' | grep -v 'grep' | awk '{print $2}' | xargs -r kill -9
-ps -ef | grep 'sysbench' | grep -v 'grep' | awk '{print $2}' | xargs -r kill -9
-ps -ef | grep 'locust' | grep -v 'grep' | awk '{print $2}' | xargs -r kill -9
-ps -ef | grep 'valkey' | grep -v 'grep' | awk '{print $2}' | xargs -r kill -9
+for proc in \
+  ndb_mgmd \
+  ndbmtd \
+  mysqld \
+  rdrs2 \
+  prometheus \
+  grafana \
+  grafana-server \
+  sysbench \
+  locust \
+  valkey \
+; do stop $proc; done
 
 #2. cleanup directories
 rm -rf ${RUN_DIR}/ndb_mgmd/data/*
@@ -18,4 +23,6 @@ rm -rf ${RUN_DIR}/ndbmtd/ndb_data/*
 rm -rf ${RUN_DIR}/ndbmtd/ndb_disk_columns/*
 rm -rf ${RUN_DIR}/mysqld/data/*
 rm -rf ${RUN_DIR}/rdrs/*
+rm -rf ${RUN_DIR}/prometheus/*
+rm -rf ${RUN_DIR}/grafana/*
 rm -rf /home/${USER}/uploads

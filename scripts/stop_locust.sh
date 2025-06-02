@@ -1,2 +1,4 @@
-#!/bin/bash
-ps -ef | grep 'locust' | grep -v 'grep' | awk '{print $2}' | xargs -r kill -9
+#!/usr/bin/env bash
+source ./scripts/include.sh
+
+stop locust

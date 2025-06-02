@@ -1,69 +1,30 @@
-#!/bin/bash
-
-if [ "$#" -ne 3 ]; then
-  echo "Usage: $0 [tarball name] [role] [skip_fetch_tarball_if_possible ? 0 : 1]"
-  exit 1
-fi
-
-source ./scripts/config
-TARBALL_NAME=${1}
-TARBALL_SOURCE=https://repo.hops.works/master/${TARBALL_NAME}
-echo "RonDB tarball source: ${TARBALL_SOURCE}"
+#!/usr/bin/env bash
+source ./scripts/include.sh
 
 # 1. check the role
-case "$2" in
-  ndb_mgmd)
-    echo "Deploying ndb_mgmd"
-    ;;
-  ndbmtd)
-    echo "Deploying ndbmtd"
-    ;;
-  mysqld)
-    echo "Deploying mysqld"
-    ;;
-  rdrs)
-    echo "Deploying rdrs"
-    ;;
-  locust)
-    echo "Deploying locust"
-    ;;
-  valkey)
-    echo "Deploying valkey"
-    ;;
-  sysbench)
-    echo "Deploying sysbench"
+case "$NODEINFO_ROLE" in
+  ndb_mgmd|ndbmtd|mysqld|rdrs|prometheus|grafana|bench)
+    echo "Deploying $NODEINFO_ROLE"
     ;;
   *)
-    echo "Unknown role: $2"
+    echo "Unknown role: $NODEINFO_ROLE"
     exit 1
     ;;
 esac
 
 # 2. Install RonDB
 TARBALL=${TARBALL_NAME%%.tar.gz}
-SKIP_FETCH_TARBALL=1
-SKIP_FETCH_TARBALL_AND_ENV=2
-skip=$3
-can_skip_tarball=0
-if [ $skip -eq $SKIP_FETCH_TARBALL ] || [ $skip -eq $SKIP_FETCH_TARBALL_AND_ENV ]; then
-  if [ -d "${WORKSPACE}/${TARBALL}" ]; then
-    can_skip_tarball=1;
-  fi
-fi
 
-if [ $can_skip_tarball -eq 0 ]; then
-  rm -rf ${WORKSPACE}
-  mkdir -p ${WORKSPACE}
-  cd ${WORKSPACE}
-  wget --retry-connrefused --retry-on-host-error --waitretry=10 -t 10 $TARBALL_SOURCE
-  tar xvf ${TARBALL_NAME}
-  ln -s ${TARBALL} rondb
-elif [ $can_skip_tarball ] && [ $skip -eq $SKIP_FETCH_TARBALL_AND_ENV ]; then
-  exit
+if need_rondb; then
+    rm -rf ${WORKSPACE}
+    mkdir -p ${WORKSPACE}
+    cd ${WORKSPACE}
+    tar xzf /tmp/${TARBALL_NAME}
+    ln -s ${TARBALL} rondb
 fi
 
 # 3. Start the role service
-case "$2" in
+case "$NODEINFO_ROLE" in
   ndb_mgmd)
     rm -rf ${RUN_DIR}
     mkdir -p ${RUN_DIR}/ndb_mgmd/data
@@ -82,27 +43,40 @@ case "$2" in
   rdrs)
     rm -rf ${RUN_DIR}
     mkdir -p ${RUN_DIR}/rdrs
-    sudo apt update
-    sudo apt install libjsoncpp-dev -y
+    sudo apt-get update -y
+    sudo apt-get install -y libjsoncpp-dev
     ;;
-  locust)
+  prometheus)
     rm -rf ${RUN_DIR}
+    mkdir -p ${RUN_DIR}/prometheus
+    sudo apt-get update -y
+    sudo apt-get install -y prometheus
+    ;;
+  grafana)
+    rm -rf ${RUN_DIR}
+    mkdir -p ${RUN_DIR}/grafana
+    sudo apt-get update -y
+    sudo apt-get install -y software-properties-common
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://packages.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+    echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://packages.grafana.com/oss/deb stable main" | \
+        sudo tee /etc/apt/sources.list.d/grafana.list
+    sudo apt-get update -y
+    sudo apt-get install -y grafana
+    ;;
+  bench)
+    rm -rf ${RUN_DIR}
+    # locust
     mkdir -p ${RUN_DIR}/locust
-    sudo apt update
-    sudo apt install python3 python3-venv -y
+    sudo apt-get update -y
+    sudo apt-get install -y python3 python3-venv -y
     python3 -m venv ${RUN_DIR}/locust
     source ${RUN_DIR}/locust/bin/activate
     pip install --upgrade pip
     pip install locust
-    ;;
-  valkey)
-    # Notice:
-    # Don't remove RUN_DIR if valkey stays with locust
-    sudo apt update
-    sudo apt install valkey-tools -y
-    ;;
-  sysbench)
-    # Notice:
-    # Don't remove RUN_DIR if sysbench stays with locust
+    # valkey
+    sudo apt-get update -y
+    sudo apt-get install -y redis-tools
+    # sysbench
     ;;
 esac
