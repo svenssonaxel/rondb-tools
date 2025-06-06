@@ -13,7 +13,8 @@ for proc in \
   sysbench \
   locust \
   valkey \
-; do stop $proc; done
+  ;
+do stop $proc; done
 
 #2. cleanup directories
 rm -rf ${RUN_DIR}/ndb_mgmd/data/*

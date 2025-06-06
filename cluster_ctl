@@ -4,6 +4,7 @@ import json, math, os, shutil, subprocess, sys, threading, time
 from pathlib import Path
 from queue import Queue, Empty
 from string import Template
+from functools import cache
 
 # Constants
 USER = "ubuntu"
@@ -11,8 +12,6 @@ WORKSPACE = f"/home/{USER}/workspace"
 RUN_DIR = f"{WORKSPACE}/rondb-run"
 NUM_CLUSTER_CONN_RDRS=2
 NUM_CLUSTER_CONN_BENCH=1
-
-tf_output = json.loads(Path("tf_output").read_text())
 
 # Node types and coloring
 node_types = [
@@ -31,38 +30,61 @@ def red(s): return color(s, '1;31')
 def green(s): return color(s, '1;32')
 
 # Nodes
-max_node_name_len = 0
+@cache
+def all_nodes():
+    nodes = []
+    for node_type, clr in node_types:
+        public_ips = get_tf_output(f'{node_type}_public_ips')
+        private_ips = get_tf_output(f'{node_type}_private_ips')
+        assert len(public_ips) == len(private_ips), "IP count mismatch"
+        for i in range(len(public_ips)):
+            nodes.append(Node(node_type, i + 1, public_ips[i], private_ips[i], clr))
+    return nodes
+@cache
+def max_node_name_len(): return max(len(n.name()) for n in all_nodes())
+def nodes_of_type(node_type):
+    return [n for n in all_nodes() if n.type == node_type]
+def node_count(node_type): return len(nodes_of_type(node_type))
 class Node:
     def __init__(self, type, idx, public_ip, private_ip, clr):
-        global max_node_name_len
         self.type = type
         self.idx = idx
         self.public_ip = public_ip
         self.private_ip = private_ip
         self.clr = clr
         self.ndb_nodeids = []
-        max_node_name_len = max(max_node_name_len, len(self.name()))
     def name(self):
         ret = self.type
-        if sum(1 for n in nodes if n.type == self.type) > 1:
+        if node_count(self.type) > 1:
             ret += f"_{self.idx}"
         return ret
     def tui_name(self):
         name = self.name()
-        return color(name, self.clr) + (' ' * (max_node_name_len - len(name)))
-nodes = []
-for node_type, clr in node_types:
-    public_ips = tf_output[f"{node_type}_public_ips"]["value"]
-    private_ips = tf_output[f"{node_type}_private_ips"]["value"]
-    assert len(public_ips) == len(private_ips), "IP count mismatch"
-    for i in range(len(public_ips)):
-        nodes.append(Node(node_type, i + 1, public_ips[i], private_ips[i], clr))
-
+        return color(name, self.clr) + (' ' * (max_node_name_len() - len(name)))
 def first(node_type):
-    for node in nodes:
+    for node in all_nodes():
         if node.type == node_type:
             return node
     raise ValueError(f"No node of type {node_type} found")
+
+# Terraform outputs
+@cache
+def tf_output():
+    tf_output_file = Path("tf_output")
+    state_file = Path("terraform.tfstate")
+    if not state_file.exists():
+        die("Error: terraform.tfstate does not exist."+
+            " Perhaps you forgot to run 'terraform apply'?")
+    if not (tf_output_file.exists() and
+            state_file.exists() and
+            state_file.stat().st_mtime < tf_output_file.stat().st_mtime):
+        proc = subprocess.run("terraform output -json > tf_output", shell=True,
+                              check=True, capture_output=True, text=True)
+        if proc.returncode != 0:
+            die(f"Error running terraform output: {proc.stdout + proc.stderr}")
+    return json.loads(tf_output_file.read_text())
+def get_tf_output(output_name):
+    return tf_output()[output_name]['value']
 
 # Generate ./config_files
 def generate_config_files():
@@ -78,11 +100,11 @@ def generate_config_files():
     CONFIG_FILES=f"/home/{USER}/config_files"
     RUN_DIR=f"{WORKSPACE}/rondb-run"
     NDB_MGMD_PRI = first('ndb_mgmd').private_ip
-    NO_OF_REPLICAS = tf_output["rondb_replicas"]["value"]
-    NUM_AZS = tf_output["num_azs"]["value"]
-    RONDB_VERSION = tf_output["rondb_version"]["value"]
-    GLIBC_VERSION = tf_output["glibc_version"]["value"]
-    CPU_PLATFORM = tf_output["cpu_platform"]["value"]
+    NO_OF_REPLICAS = get_tf_output('rondb_replicas')
+    NUM_AZS = get_tf_output('num_azs')
+    RONDB_VERSION = get_tf_output('rondb_version')
+    GLIBC_VERSION = get_tf_output('glibc_version')
+    CPU_PLATFORM = get_tf_output('cpu_platform')
     TARBALL_NAME = f"rondb-{RONDB_VERSION}-linux-glibc{GLIBC_VERSION}-{CPU_PLATFORM}.tar.gz"
     # Generate shell_vars
     w("config_files/shell_vars",
@@ -94,8 +116,8 @@ def generate_config_files():
       f"NUM_AZS={NUM_AZS}",
       f"NDB_MGMD_PRI={NDB_MGMD_PRI}",
       f"MYSQLD_PUB_1={first('mysqld').public_ip}",
-      f"RDRS_LB=http://{tf_output['rdrs_nlb_dns']['value']}:4406",
-      f"RONDIS_LB={tf_output['rondis_nlb_dns']['value']}:6379",
+      f"RDRS_LB=http://{get_tf_output('rdrs_nlb_dns')}:4406",
+      f"RONDIS_LB={get_tf_output('rondis_nlb_dns')}:6379",
       f"RDRS_PRI_1={first('rdrs').private_ip}",
       f"BENCH_PRI_1={first('bench').private_ip}",
       )
@@ -120,7 +142,7 @@ def generate_config_files():
         last_node_id += 1
         n.ndb_nodeids += [last_node_id]
         return last_node_id
-    for node in nodes:
+    for node in all_nodes():
         configini += [""]
         if node.type == "ndbmtd":
             configini += [
@@ -170,48 +192,47 @@ def generate_config_files():
         "[mysql_cluster]",
         f"ndb-connectstring={NDB_MGMD_PRI}",
       )
-    for node in nodes:
+    for node in all_nodes():
         w(f"config_files/nodeinfo_{node.name()}",
           f"NODEINFO_ROLE={node.type}",
           f"NODEINFO_IDX={node.idx}",
           f"NODEINFO_NODEIDS=\"{' '.join(map(str, node.ndb_nodeids))}\"",
           )
     # Generate rdrs_*.json (needs Node.ndb_nodeids)
-    for node in nodes:
-        if node.type == "rdrs":
-            w(f"config_files/rdrs_{node.idx}.json",
-              json.dumps({
-                  "RonDB": {
-                      "Mgmds": [{"IP": NDB_MGMD_PRI}],
-                      "ConnectionPoolSize": 2,
-                      "NodeIDs": node.ndb_nodeids,
-                  },
-                  "REST": {
-                      "NumThreads": 64,
-                      "UseCompression": False,
-                      "UseSingleTransaction": False,
-                  },
-                  "Rondis": {
-                      "Enable": True,
-                      "NumThreads": 32,
-                      "NumDatabases": 2,
-                      "Databases": [
-                          {
-                              "Index": 0,
-                              "FastHCOUNT": True,
-                          },
-                          {
-                              "Index": 1,
-                              "FastHCOUNT": False,
-                          },
-                      ],
-                  },
-                  "Security": {
-                      "APIKey": {
-                          "UseHopsworksAPIKeys": False,
+    for node in nodes_of_type("rdrs"):
+        w(f"config_files/rdrs_{node.idx}.json",
+          json.dumps({
+              "RonDB": {
+                  "Mgmds": [{"IP": NDB_MGMD_PRI}],
+                  "ConnectionPoolSize": 2,
+                  "NodeIDs": node.ndb_nodeids,
+              },
+              "REST": {
+                  "NumThreads": 64,
+                  "UseCompression": False,
+                  "UseSingleTransaction": False,
+              },
+              "Rondis": {
+                  "Enable": True,
+                  "NumThreads": 32,
+                  "NumDatabases": 2,
+                  "Databases": [
+                      {
+                          "Index": 0,
+                          "FastHCOUNT": True,
                       },
+                      {
+                          "Index": 1,
+                          "FastHCOUNT": False,
+                      },
+                  ],
+              },
+              "Security": {
+                  "APIKey": {
+                      "UseHopsworksAPIKeys": False,
                   },
-              }, indent=4))
+              },
+          }, indent=4))
     # Generate prometheus.yml
     prometheus_yml = [
         "global:",
@@ -220,13 +241,12 @@ def generate_config_files():
         "  - job_name: 'rdrs'",
         "    static_configs:",
     ]
-    for node in nodes:
-        if node.type == "rdrs":
-            prometheus_yml += [
-                f"      - targets: ['{node.private_ip}:4406']",
-                "        labels:",
-                f"          instance: '{node.name()}'",
-            ]
+    for node in nodes_of_type("rdrs"):
+        prometheus_yml += [
+            f"      - targets: ['{node.private_ip}:4406']",
+            "        labels:",
+            f"          instance: '{node.name()}'",
+        ]
     w("config_files/prometheus.yml", *prometheus_yml)
     # Generate grafana/
     mkdir("config_files/grafana/dashboards")
@@ -325,20 +345,22 @@ def run_for_one_node(node, cmdfun):
         elif cmd == LOCK_REPO: repo_lock.acquire()
         elif cmd == UNLOCK_REPO: repo_lock.release()
         elif not failed: stream_process(cmd, node.tui_name())
-def run_for_all_nodes(cmdfun):
+def run_for_all(for_nodes, cmdfun):
     threads = [ threading.Thread(target=run_for_one_node, args=(node, cmdfun))
-                for node in nodes ]
+                for node in for_nodes ]
     for thread in threads: thread.start()
     for t in threads: t.join()
     check_failed()
-ssh_opts = ["-i", f"{tf_output['key_name']['value']}.pem",
-            "-o", "StrictHostKeyChecking=no",
-            "-q"]
+def ssh_opts():
+    return [
+        "-i", f"{get_tf_output('key_name')}.pem",
+        "-o", "StrictHostKeyChecking=no",
+        "-q"]
 def ssh(node, cmd=""):
-    return ["ssh", *ssh_opts, f"{USER}@{node.public_ip}",
+    return ["ssh", *ssh_opts(), f"{USER}@{node.public_ip}",
             *([] if cmd=="" else [cmd])]
 def rsync(file, node):
-    return ["rsync", "-az", "--delete", "-e", f"ssh {' '.join(ssh_opts)}",
+    return ["rsync", "-az", "--delete", "-e", f"ssh {' '.join(ssh_opts())}",
             file, f"{USER}@{node.public_ip}:"]
 
 # deploy command
@@ -346,26 +368,23 @@ def do_deploy():
     generate_config_files()
     print("Deployment preview:")
     print("--------------------------------------------------")
-    for node in nodes:
+    for node in all_nodes():
         print(f"{node.tui_name()} -> {node.private_ip} / {node.public_ip}")
     print("--------------------------------------------------")
     input("Press any key to continue...")
-    def cmdfun(node):
-        ip = node.public_ip
-        return [
-            ssh(node, "sudo apt-get update -y"),
-            ssh(node, "sudo apt-get install -y rsync libncurses6"),
-            LOCK_UPLOAD,
-            rsync("./scripts", node),
-            rsync("./config_files", node),
-            UNLOCK_UPLOAD,
-            ssh(node, f"cp config_files/nodeinfo_{node.name()} config_files/nodeinfo"),
-            LOCK_REPO,
-            ssh(node, "bash ~/scripts/download_tarball.sh"),
-            UNLOCK_REPO,
-            ssh(node, "bash ~/scripts/deploy.sh"),
-        ]
-    run_for_all_nodes(cmdfun)
+    run_for_all(all_nodes(), lambda node: [
+        ssh(node, "sudo apt-get update -y"),
+        ssh(node, "sudo apt-get install -y rsync libncurses6"),
+        LOCK_UPLOAD,
+        rsync("./scripts", node),
+        rsync("./config_files", node),
+        UNLOCK_UPLOAD,
+        ssh(node, f"cp config_files/nodeinfo_{node.name()} config_files/nodeinfo"),
+        LOCK_REPO,
+        ssh(node, "bash ~/scripts/download_tarball.sh"),
+        UNLOCK_REPO,
+        ssh(node, "bash ~/scripts/deploy.sh"),
+    ])
 
 # start command
 def do_start_cluster():
@@ -374,18 +393,16 @@ def do_start_cluster():
         if start_type == "bench": continue
         print("Waiting 2 seconds...")
         time.sleep(2)
-        def cmdfun(node):
-            if node.type != start_type: return []
-            return [ ssh(node, f"bash ~/scripts/start_{node.type}.sh") ]
-        run_for_all_nodes(cmdfun)
+        run_for_all(nodes_of_type(start_type), lambda node: [
+            ssh(node, f"bash ~/scripts/start_{node.type}.sh")
+        ])
     print(f'Go to http://{first("grafana").public_ip}:3000/d/rondb_bench_dashboard in the browser to see the dashboard.')
 
 # stop command
 def do_stop_cluster():
-    def cmdfun(node):
-        ip = node.public_ip
-        return [ ssh(node, "bash ~/scripts/cleanup.sh") ]
-    run_for_all_nodes(cmdfun)
+    run_for_all(all_nodes(), lambda node: [
+        ssh(node, "bash ~/scripts/cleanup.sh")
+    ])
 
 # open_tmux command
 def do_open_tmux():
@@ -395,7 +412,7 @@ def do_open_tmux():
     session_name = "rondb_bm"
     if not tmux("has-session", "-t", session_name, capture_output=True, check=False):
         tmux("new-session", "-d", "-s", session_name)
-        for node in nodes:
+        for node in all_nodes():
             name = node.name()
             tmux("new-window", "-t", session_name, "-n", name, *ssh(node))
             line=f"cd {RUN_DIR}/{node.type}"
@@ -409,8 +426,8 @@ def do_open_tmux():
 
 # start locust command
 def do_start_locust(total_workers):
-    num_bench_nodes = sum(1 for x in nodes if x.type == "bench")
-    cpus_per_node = tf_output['bench_cpus_per_node']['value']
+    num_bench_nodes = node_count("bench")
+    cpus_per_node = get_tf_output('bench_cpus_per_node')
     cpus = num_bench_nodes * cpus_per_node
     max_workers = cpus - 1 # Reserve one CPU for master
     min_workers = max(1, num_bench_nodes - 1)
@@ -421,20 +438,18 @@ def do_start_locust(total_workers):
         die(f"Error: Total workers must be in the range {min_workers} - {max_workers}")
     do_stop_locust()
     def cmdfun(node):
-        if node.type != "bench": return []
         num_workers = math.floor(total_workers / num_bench_nodes)
         if (total_workers - num_workers * num_bench_nodes) > (num_bench_nodes - node.idx):
             num_workers += 1
         return [ ssh(node, f"bash ~/scripts/start_locust.sh {num_workers}") ]
-    run_for_all_nodes(cmdfun)
+    run_for_all(nodes_of_type("bench"), cmdfun)
     print(f"Go to  http://{first('bench').public_ip}:8089 in the browser to start the benchmark")
 
 # stop_locust command
 def do_stop_locust():
-    def cmdfun(node):
-        if node.type != "bench": return []
-        return [ ssh(node, "bash ~/scripts/stop_locust.sh") ]
-    run_for_all_nodes(cmdfun)
+    run_for_all(nodes_of_type("bench"), lambda node: [
+        ssh(node, "bash ~/scripts/stop_locust.sh")
+    ])
 
 # populate command
 def do_populate(columns, rows, column_types):
