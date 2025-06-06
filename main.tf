@@ -95,6 +95,8 @@ resource "aws_security_group" "rondb_bench" {
 
 data "aws_ami" "ubuntu" {
   most_recent = true
+  # 099720109477 is the OwnerId for Canonical, see
+  # https://documentation.ubuntu.com/aws/aws-how-to/instances/find-ubuntu-images/
   owners      = ["099720109477"]
   filter {
     name   = "name"

@@ -442,8 +442,8 @@ def do_populate(columns, rows, column_types):
     if column_types not in ['INT', 'VARCHAR', 'INT_AND_VARCHAR']:
         die("COLUMN_INFO must be one of: INT, VARCHAR, INT_AND_VARCHAR")
     num_columns = int(columns)
-    if num_columns < 1 or 1000 < num_columns:
-        die("NUM_COLUMNS must be in the range 1 - 1,000")
+    if num_columns < 1 or 200 < num_columns:
+        die("NUM_COLUMNS must be in the range 1 - 200")
     num_rows = int(rows)
     if num_rows < 1 or 1000000000 < num_rows:
         die("NUM_ROWS must be in the range 1 - 1,000,000,000")
