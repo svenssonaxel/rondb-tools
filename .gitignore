@@ -1,0 +1,8 @@
+*.pem
+.terraform.lock.hcl
+.terraform.tfstate.lock.info
+.terraform/
+config_files/
+terraform.tfstate
+terraform.tfstate.backup
+tf_output
