@@ -5,6 +5,6 @@ terraform destroy
 aws ec2 delete-key-pair --key-name $key_name --region $region
 rm -rf .terraform* terraform.tfstate* tf_output \
    $key_name.pem config_files __pycache__
-if command -v tmux >/dev/null && tmux has-session -t rondb_bench; then
-  tmux kill-session -t rondb_bench
+if command -v tmux >/dev/null && tmux has-session -t rondb_bm; then
+  tmux kill-session -t rondb_bm
 fi
