@@ -23,7 +23,10 @@ if need_rondb; then
   ln -s ${TARBALL} rondb
 fi
 
-# 3. Install services and create directories
+# Install prometheus exporter for OS metrics on all nodes
+sudo apt-get install -y prometheus-node-exporter
+
+# 4. Install services and create directories
 case "$NODEINFO_ROLE" in
   ndb_mgmd)
     rm -rf ${RUN_DIR}
@@ -39,6 +42,12 @@ case "$NODEINFO_ROLE" in
   mysqld)
     rm -rf ${RUN_DIR}
     mkdir -p ${RUN_DIR}/mysqld/data
+    sudo apt-get install -y golang
+    cd ${WORKSPACE}
+    git clone https://github.com/logicalclocks/mysqld_exporter.git
+    cd mysqld_exporter
+    git checkout origin/ndb
+    go build
     ;;
   rdrs)
     rm -rf ${RUN_DIR}

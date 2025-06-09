@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 source ./scripts/include.sh
 
+# Start mysqld
 before-start mysqld
 (set -x
  $bin/mysqld --defaults-file=./config_files/my.cnf --initialize-insecure
  $bin/mysqld --defaults-file=./config_files/my.cnf &)
 after-start mysqld
 
+# Operations to run on the first node only
 if [ $NODEINFO_IDX -eq 1 ]; then
+  # Wait for mysqld to start
   WAITED=0
   MAX_WAIT=100
   while true; do
@@ -22,6 +25,14 @@ if [ $NODEINFO_IDX -eq 1 ]; then
     sleep 5
     WAITED=$((WAITED + 1))
   done
+  # Start prometheus myslqd exporter
+  before-start mysqld_exporter
+  export DATA_SOURCE_NAME='root:@tcp(127.0.0.1:3306)/'
+  (set -x
+   ${WORKSPACE}/mysqld_exporter/mysqld_exporter --no-collect.slave_status \
+               > "${RUN_DIR}/mysqld_exporter.log" 2>&1 &)
+  after-start mysqld_exporter
+  # Init database
   echo "Creating the procedure for creating rdrs benchmark table" \
        "on MySQL ${MYSQLD_PUB_1}"
   $mysql -e "source ./scripts/benchmark_load.sql"

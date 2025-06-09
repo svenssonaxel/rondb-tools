@@ -252,6 +252,27 @@ def generate_config_files():
             "        labels:",
             f"          instance: '{node.name()}'",
         ]
+    prometheus_yml += [
+        "  - job_name: 'mysqld'",
+        "    static_configs:",
+    ]
+    for node in nodes_of_type("mysqld"):
+        prometheus_yml += [
+            f"      - targets: ['{node.private_ip}:9104']",
+            "        labels:",
+            f"          instance: '{node.name()}'",
+        ]
+    prometheus_yml += [
+        "  - job_name: 'linux'",
+        "    static_configs:",
+    ]
+    for node in all_nodes():
+        prometheus_yml += [
+            f"      - targets: ['{node.private_ip}:9100']",
+            "        labels:",
+            f"          instance: '{node.name()}'",
+            f"          instance_type: '{node.type}'",
+        ]
     w("config_files/prometheus.yml", *prometheus_yml)
     # Generate grafana/
     mkdir("config_files/grafana/dashboards")

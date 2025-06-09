@@ -7,7 +7,8 @@ bin="${WORKSPACE}/rondb/bin"
 mysql="$bin/mysql -uroot"
 
 is-running() {
-  pgrep -x $1 >/dev/null
+  # linux process names are max 15 characters.
+  pgrep -x "${1:0:15}" >/dev/null
 }
 
 before-start() {

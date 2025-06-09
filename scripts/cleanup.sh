@@ -6,6 +6,7 @@ for proc in \
   ndb_mgmd \
   ndbmtd \
   mysqld \
+  mysqld_exporter \
   rdrs2 \
   prometheus \
   grafana \
