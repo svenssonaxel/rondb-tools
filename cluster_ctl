@@ -390,7 +390,7 @@ def do_install(for_nodes):
         LOCK_REPO,
         ssh(node, "bash ~/scripts/download_tarball.sh"),
         UNLOCK_REPO,
-        ssh(node, "bash ~/scripts/deploy.sh"),
+        ssh(node, "bash ~/scripts/install.sh"),
     ])
 
 # start command
