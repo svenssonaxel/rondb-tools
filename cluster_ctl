@@ -300,6 +300,15 @@ def generate_config_files():
       f"    url: http://{first('prometheus').private_ip}:9090",
       "    isDefault: true",
       "    uid: prometheus",
+      # Dashboards copied from hopsworks-helm use a different data source uid.
+      # By defining a second data source with the same endpoint, we can support
+      # both without changing the dashboards.
+      "  - name: Prometheus (alias)",
+      "    type: prometheus",
+      "    access: proxy",
+      f"    url: http://{first('prometheus').private_ip}:9090",
+      "    isDefault: false",
+      "    uid: PBFA97CFB590B2093",
       )
     w("config_files/grafana/dashboards/dashboards.yaml",
       "apiVersion: 1",
@@ -311,11 +320,10 @@ def generate_config_files():
       "    folderUid: ''",
       "    type: file",
       "    options:",
-      f"      path: {CONFIG_FILES}/grafana/dashboards/dashboard.json",
+      f"      path: {CONFIG_FILES}/grafana/dashboards",
       )
-    Path("config_files/grafana/dashboards/dashboard.json").write_text(
-        Path("dashboard.json").read_text()
-    )
+    shutil.copytree("dashboards", "config_files/grafana/dashboards",
+                    dirs_exist_ok=True)
 
 # Parallell processing and TUI
 failed = False
@@ -434,8 +442,7 @@ def do_start_cluster(for_nodes):
             ssh(node, f"bash ~/scripts/start_{node.type}.sh")
         ])
     if print_uri:
-        uri=lnk(f"http://{first('grafana').public_ip}:3000"
-                "/d/rondb_bench_dashboard")
+        uri=lnk(f"http://{first('grafana').public_ip}:3000/d/rdrs")
         print(f'Go to {uri} in your browser to see the dashboard.')
 
 # deploy command
