@@ -43,6 +43,23 @@ def all_nodes():
         assert len(public_ips) == len(private_ips), "IP count mismatch"
         for i in range(len(public_ips)):
             nodes.append(Node(node_type, i, public_ips[i], private_ips[i], clr))
+    last_node_id = 0
+    def next_node_id():
+        nonlocal last_node_id
+        last_node_id += 1
+        return last_node_id
+    node_type_num_nodeids = {
+        "ndb_mgmd":   1,
+        "ndbmtd":     1,
+        "mysqld":     1,
+        "rdrs":       NUM_CLUSTER_CONN_RDRS,
+        "prometheus": 0,
+        "grafana":    0,
+        "bench":      NUM_CLUSTER_CONN_BENCH,
+    }
+    for node in nodes:
+        num_nodeids = node_type_num_nodeids[node.type]
+        node.ndb_nodeids = [next_node_id() for _ in range(num_nodeids)]
     return nodes
 @cache
 def max_node_name_len(): return max(len(n.name()) for n in all_nodes())
@@ -136,61 +153,39 @@ def generate_config_files():
       )
     # Generate config.ini and populate Node.ndb_nodeids
     configini = [
-      "[NDBD DEFAULT]",
-      "AutomaticThreadConfig=true",
-      "AutomaticMemoryConfig=true",
-      "MaxDMLOperationsPerTransaction=100000",
-      "MaxNoOfConcurrentOperations=100000",
-      "",
-      f"NoOfReplicas={NO_OF_REPLICAS}",
-      "PartitionsPerNode=4",
-      "",
-      "[NDB_MGMD]",
-      f"HostName={NDB_MGMD_PRI}",
-      f"DataDir={RUN_DIR}/ndb_mgmd/data",
+        "[NDB_MGMD DEFAULT]",
+        f"DataDir={RUN_DIR}/ndb_mgmd/data",
+        "",
+        "[NDBD DEFAULT]",
+        "AutomaticThreadConfig=true",
+        "AutomaticMemoryConfig=true",
+        "MaxDMLOperationsPerTransaction=100000",
+        "MaxNoOfConcurrentOperations=100000",
+        f"FileSystemPath={RUN_DIR}/ndbmtd/ndb_data",
+        f"FileSystemPathDD={RUN_DIR}/ndbmtd/ndb_disk_columns",
+        f"DataDir={RUN_DIR}/ndbmtd/data",
+        "",
+        f"NoOfReplicas={NO_OF_REPLICAS}",
+        "PartitionsPerNode=4",
     ]
-    last_node_id = 1
-    def next_node_id(n):
-        nonlocal last_node_id
-        last_node_id += 1
-        n.ndb_nodeids += [last_node_id]
-        return last_node_id
+    node_type_configini_header = {
+        "ndb_mgmd":   "[NDB_MGMD]",
+        "ndbmtd":     "[NDBD]",
+        "mysqld":     "[MYSQLD]",
+        "rdrs":       "[API]",
+        "bench":      "[API]",
+    }
     for node in all_nodes():
+        if not node.type in node_type_configini_header: continue
         configini += [""]
-        if node.type == "ndbmtd":
+        for nodeid in node.ndb_nodeids:
             configini += [
-                "[NDBD]",
+                node_type_configini_header[node.type],
+                f"# {node.name()}",
                 f"HostName={node.private_ip}",
-                f"NodeId={next_node_id(node)}",
-                f"DataDir={RUN_DIR}/{node.type}/data",
-                f"FileSystemPath={RUN_DIR}/ndbmtd/ndb_data",
-                f"FileSystemPathDD={RUN_DIR}/ndbmtd/ndb_disk_columns",
+                f"NodeId={nodeid}",
                 f"LocationDomainId={node.idx % NUM_AZS}"
             ]
-        if node.type == "mysqld":
-            configini += [
-                "[MYSQLD]",
-                f"HostName={node.private_ip}",
-                f"NodeId={next_node_id(node)}",
-                f"LocationDomainId={node.idx % NUM_AZS}"
-            ]
-        if node.type == "rdrs":
-            for _ in range(NUM_CLUSTER_CONN_RDRS):
-                configini += [
-                    "[API]",
-                    "# RDRS",
-                    f"HostName={node.private_ip}",
-                    f"NodeId={next_node_id(node)}",
-                    f"LocationDomainId={node.idx % NUM_AZS}"
-                ]
-        if node.type == "bench":
-            for _ in range(NUM_CLUSTER_CONN_BENCH):
-                configini += [
-                    "[API]",
-                    "# BENCH",
-                    f"HostName={node.private_ip}",
-                    f"NodeId={next_node_id(node)}",
-                ]
     w("config_files/config.ini", *configini)
     # Generate my.cnf (needs Node.ndb_nodeids)
     w("config_files/my.cnf",
