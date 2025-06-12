@@ -11,7 +11,7 @@ WORKERS=$2
 source ${RUN_DIR}/locust/bin/activate
 
 before-start locust
-if [ ${NODEINFO_IDX} -eq 1 ]; then
+if [ ${NODEINFO_IDX} -eq 0 ]; then
   # Start master
   RDRS_HOST=${RDRS_LB:-"http://${RDRS_PRI_1}:5406"}
   (set -x

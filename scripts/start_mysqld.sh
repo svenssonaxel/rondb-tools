@@ -9,7 +9,7 @@ before-start mysqld
 after-start mysqld
 
 # Operations to run on the first node only
-if [ $NODEINFO_IDX -eq 1 ]; then
+if [ $NODEINFO_IDX -eq 0 ]; then
   # Wait for mysqld to start
   WAITED=0
   MAX_WAIT=100

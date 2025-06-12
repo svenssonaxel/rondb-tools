@@ -42,7 +42,7 @@ def all_nodes():
         private_ips = get_tf_output(f'{node_type}_private_ips')
         assert len(public_ips) == len(private_ips), "IP count mismatch"
         for i in range(len(public_ips)):
-            nodes.append(Node(node_type, i + 1, public_ips[i], private_ips[i], clr))
+            nodes.append(Node(node_type, i, public_ips[i], private_ips[i], clr))
     return nodes
 @cache
 def max_node_name_len(): return max(len(n.name()) for n in all_nodes())
@@ -583,7 +583,7 @@ def do_start_locust(rows, total_workers, only_validate=False):
     # Start
     def cmdfun(node):
         num_workers = math.floor(total_workers / num_bench_nodes)
-        if ((total_workers - num_workers * num_bench_nodes) >
+        if ((total_workers - num_workers * num_bench_nodes) >=
             (num_bench_nodes - node.idx)):
             num_workers += 1
         return [ ssh(node, f"bash ~/scripts/start_locust.sh {rows}" +
