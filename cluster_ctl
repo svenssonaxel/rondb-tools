@@ -91,6 +91,14 @@ def tf_output():
 def get_tf_output(output_name):
     return tf_output()[output_name]['value']
 
+@cache
+def get_gui_secret():
+    secret_file = Path("gui_secret.txt")
+    if not secret_file.exists():
+        secret = os.urandom(10).hex()
+        secret_file.write_text(secret)
+    return secret_file.read_text().strip()
+
 # Generate ./config_files
 def generate_config_files():
     # Util functions
@@ -289,6 +297,8 @@ def generate_config_files():
       "[auth.anonymous]",
       "enabled = true",
       "org_role = Admin",
+      "[live]",
+      f"allowed_origins = http://{first('grafana').public_ip}:8080",
       )
     w("config_files/grafana/datasources/prometheus.yaml",
       "apiVersion: 1",
@@ -324,6 +334,48 @@ def generate_config_files():
       )
     shutil.copytree("dashboards", "config_files/grafana/dashboards",
                     dirs_exist_ok=True)
+    # nginx config for grafana and locust. This implements a simple cookie-based
+    # authentication. An unauthenticated user receives 403 for all requests
+    # except /secret/path, which will set the authentication cookie and redirect
+    # to /path.
+    gui_secret = get_gui_secret()
+    for config_file_name, service_port in [("nginx_grafana.conf", 3000),
+                                           ("nginx_locust.conf", 8089)]:
+        w(f"config_files/{config_file_name}",
+          f'error_log {RUN_DIR}/nginx/nginx_error.log error;',
+          f'pid {RUN_DIR}/nginx/nginx.pid;',
+          'events {',
+          '  worker_connections 4096;',
+          '}',
+          'http {',
+          '  map $http_upgrade $connection_upgrade {',
+          '    default upgrade;',
+          '    ""      close;',
+          '  }',
+          f'  client_body_temp_path {RUN_DIR}/nginx/client_temp;',
+          f'  proxy_temp_path       {RUN_DIR}/nginx/proxy_temp;',
+          f'  fastcgi_temp_path     {RUN_DIR}/nginx/fastcgi_temp;',
+          f'  uwsgi_temp_path       {RUN_DIR}/nginx/uwsgi_temp;',
+          f'  scgi_temp_path        {RUN_DIR}/nginx/scgi_temp;',
+          '  server {',
+          f'    access_log {RUN_DIR}/nginx/nginx_access.log;',
+          '    listen 8080;',
+          f'    location ~ ^/{gui_secret}(/.*)$ {{',
+          f'      add_header Set-Cookie "X-AUTH={gui_secret}; Path=/";',
+          '      return 302 $1;',
+          '    }',
+          '    location / {',
+          f'      if ($http_cookie !~* "X-AUTH={gui_secret}") {{',
+          '        return 403;',
+          '      }',
+          '      proxy_http_version 1.1;',
+          '      proxy_set_header Upgrade $http_upgrade;',
+          '      proxy_set_header Connection $connection_upgrade;',
+          f'      proxy_pass http://localhost:{service_port};',
+          '    }',
+          '  }',
+          '}',
+          )
 
 # Parallell processing and TUI
 failed = False
@@ -442,7 +494,8 @@ def do_start_cluster(for_nodes):
             ssh(node, f"bash ~/scripts/start_{node.type}.sh")
         ])
     if print_uri:
-        uri=lnk(f"http://{first('grafana').public_ip}:3000/d/rdrs")
+        uri=lnk(f"http://{first('grafana').public_ip}:8080"
+                f"/{get_gui_secret()}/d/rdrs")
         print(f'Go to {uri} in your browser to see the dashboard.')
 
 # deploy command
@@ -537,7 +590,7 @@ def do_start_locust(rows, total_workers, only_validate=False):
                      f" {num_workers}") ]
     run_for_all(nodes_of_type("bench"), cmdfun)
     # Print URI
-    uri=lnk(f"http://{first('bench').public_ip}:8089")
+    uri=lnk(f"http://{first('bench').public_ip}:8080/{get_gui_secret()}/")
     print(f"Go to {uri} in your browser to start the benchmark")
 
 # stop_locust command

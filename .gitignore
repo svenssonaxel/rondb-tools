@@ -3,6 +3,7 @@
 .terraform.tfstate.lock.info
 .terraform/
 config_files/
+gui_secret.txt
 terraform.tfstate
 terraform.tfstate.backup
 tf_output

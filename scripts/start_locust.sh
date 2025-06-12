@@ -35,3 +35,8 @@ else
   done
 fi
 after-start locust
+before-start nginx
+(set -x
+ nginx -c ${CONFIG_FILES}/nginx_locust.conf
+)
+after-start nginx

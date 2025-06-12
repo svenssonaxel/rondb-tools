@@ -11,6 +11,7 @@ for proc in \
   prometheus \
   grafana \
   grafana-server \
+  nginx \
   sysbench \
   locust \
   valkey \
@@ -27,4 +28,5 @@ rm -rf ${RUN_DIR}/mysqld/data/*
 rm -rf ${RUN_DIR}/rdrs/*
 rm -rf ${RUN_DIR}/prometheus/*
 rm -rf ${RUN_DIR}/grafana/*
+rm -rf ${RUN_DIR}/nginx/*
 rm -rf /home/${USER}/uploads

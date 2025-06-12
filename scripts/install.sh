@@ -62,8 +62,10 @@ case "$NODEINFO_ROLE" in
     ;;
   grafana)
     rm -rf ${RUN_DIR}
-    mkdir -p ${RUN_DIR}/grafana
-    sudo apt-get install -y software-properties-common
+    mkdir -p ${RUN_DIR}/grafana ${RUN_DIR}/nginx
+    sudo systemctl mask nginx
+    sudo DEBIAN_FRONTEND=noninteractive \
+         apt-get install -y software-properties-common nginx
     sudo mkdir -p /etc/apt/keyrings
     curl -fsSL https://packages.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
     echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://packages.grafana.com/oss/deb stable main" | \
@@ -75,9 +77,12 @@ case "$NODEINFO_ROLE" in
     rm -rf ${RUN_DIR}
     # Install python3 and python3-venv, needed for locust.
     # Install redis-tools, needed for valkey.
-    sudo apt-get install -y python3 python3-venv redis-tools
+    # Install nginx, needed for automatic authentication.
+    sudo systemctl mask nginx
+    sudo DEBIAN_FRONTEND=noninteractive \
+         apt-get install -y python3 python3-venv redis-tools nginx
     # Install locust
-    mkdir -p ${RUN_DIR}/locust
+    mkdir -p ${RUN_DIR}/locust ${RUN_DIR}/nginx
     python3 -m venv ${RUN_DIR}/locust
     source ${RUN_DIR}/locust/bin/activate
     pip install -q --upgrade pip
