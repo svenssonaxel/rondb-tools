@@ -615,7 +615,7 @@ if __name__ == "__main__":
         print('\n'.join([
             "Usage:",
             "  ./cluster_ctl deploy [NODE_TYPE]",
-            "    Install and start RondB services.",
+            "    Install and start RonDB services.",
             "      NODE_TYPE: See bottom.",
             "",
             "  ./cluster_ctl install [NODE_TYPE]",
