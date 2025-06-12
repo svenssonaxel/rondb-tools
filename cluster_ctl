@@ -10,18 +10,19 @@ from functools import cache
 USER = "ubuntu"
 WORKSPACE = f"/home/{USER}/workspace"
 RUN_DIR = f"{WORKSPACE}/rondb-run"
+NUM_CLUSTER_CONN_MYSQLD=1
 NUM_CLUSTER_CONN_RDRS=2
 NUM_CLUSTER_CONN_BENCH=1
 
-# Node types and coloring
+# Node types, number of NDB NodeIds, and color
 node_types = [
-    ("ndb_mgmd",  "48;2;0;120;0;38;5;255"),
-    ("ndbmtd",    "48;2;0;214;0;38;5;16"),
-    ("mysqld",    "48;2;104;62;254;38;5;255"),
-    ("rdrs",      "48;2;200;169;254;38;5;16"),
-    ("prometheus","48;2;184;0;184;38;5;255"),
-    ("grafana",   "48;2;254;144;249;38;5;16"),
-    ("bench",     "48;2;190;190;0;38;5;16"),
+    ("ndb_mgmd",   1,                       "48;2;0;120;0;38;5;255"),
+    ("ndbmtd",     1,                       "48;2;0;214;0;38;5;16"),
+    ("mysqld",     NUM_CLUSTER_CONN_MYSQLD, "48;2;104;62;254;38;5;255"),
+    ("rdrs",       NUM_CLUSTER_CONN_RDRS,   "48;2;200;169;254;38;5;16"),
+    ("prometheus", 0,                       "48;2;184;0;184;38;5;255"),
+    ("grafana",    0,                       "48;2;254;144;249;38;5;16"),
+    ("bench",      NUM_CLUSTER_CONN_BENCH,  "48;2;190;190;0;38;5;16"),
 ]
 import sys
 stdout_is_tty=sys.stdout.isatty()
@@ -37,12 +38,18 @@ def lnk(uri):
 @cache
 def all_nodes():
     nodes = []
-    for node_type, clr in node_types:
+    nodeid = 0
+    for node_type, num_nodeids, clr in node_types:
         public_ips = get_tf_output(f'{node_type}_public_ips')
         private_ips = get_tf_output(f'{node_type}_private_ips')
         assert len(public_ips) == len(private_ips), "IP count mismatch"
         for i in range(len(public_ips)):
-            nodes.append(Node(node_type, i, public_ips[i], private_ips[i], clr))
+            nodes.append(Node(node_type,
+                              i,
+                              public_ips[i],
+                              private_ips[i],
+                              [(nodeid:=nodeid+1) for _ in range(num_nodeids)],
+                              clr))
     return nodes
 @cache
 def max_node_name_len(): return max(len(n.name()) for n in all_nodes())
@@ -50,13 +57,13 @@ def nodes_of_type(node_type):
     return [n for n in all_nodes() if n.type == node_type]
 def node_count(node_type): return len(nodes_of_type(node_type))
 class Node:
-    def __init__(self, type, idx, public_ip, private_ip, clr):
+    def __init__(self, type, idx, public_ip, private_ip, ndb_nodeids, clr):
         self.type = type
         self.idx = idx
         self.public_ip = public_ip
         self.private_ip = private_ip
+        self.ndb_nodeids = ndb_nodeids
         self.clr = clr
-        self.ndb_nodeids = []
     def name(self):
         ret = self.type
         if node_count(self.type) > 1:
@@ -134,65 +141,43 @@ def generate_config_files():
       f"RDRS_PRI_1={first('rdrs').private_ip}",
       f"BENCH_PRI_1={first('bench').private_ip}",
       )
-    # Generate config.ini and populate Node.ndb_nodeids
+    # Generate config.ini
     configini = [
-      "[NDBD DEFAULT]",
-      "AutomaticThreadConfig=true",
-      "AutomaticMemoryConfig=true",
-      "MaxDMLOperationsPerTransaction=100000",
-      "MaxNoOfConcurrentOperations=100000",
-      "",
-      f"NoOfReplicas={NO_OF_REPLICAS}",
-      "PartitionsPerNode=4",
-      "",
-      "[NDB_MGMD]",
-      f"HostName={NDB_MGMD_PRI}",
-      f"DataDir={RUN_DIR}/ndb_mgmd/data",
+        "[NDB_MGMD DEFAULT]",
+        f"DataDir={RUN_DIR}/ndb_mgmd/data",
+        "",
+        "[NDBD DEFAULT]",
+        "AutomaticThreadConfig=true",
+        "AutomaticMemoryConfig=true",
+        "MaxDMLOperationsPerTransaction=100000",
+        "MaxNoOfConcurrentOperations=100000",
+        f"FileSystemPath={RUN_DIR}/ndbmtd/ndb_data",
+        f"FileSystemPathDD={RUN_DIR}/ndbmtd/ndb_disk_columns",
+        f"DataDir={RUN_DIR}/ndbmtd/data",
+        "",
+        f"NoOfReplicas={NO_OF_REPLICAS}",
+        "PartitionsPerNode=4",
     ]
-    last_node_id = 1
-    def next_node_id(n):
-        nonlocal last_node_id
-        last_node_id += 1
-        n.ndb_nodeids += [last_node_id]
-        return last_node_id
+    node_type_configini_header = {
+        "ndb_mgmd":   "[NDB_MGMD]",
+        "ndbmtd":     "[NDBD]",
+        "mysqld":     "[MYSQLD]",
+        "rdrs":       "[API]",
+        "bench":      "[API]",
+    }
     for node in all_nodes():
+        if not node.type in node_type_configini_header: continue
         configini += [""]
-        if node.type == "ndbmtd":
+        for nodeid in node.ndb_nodeids:
             configini += [
-                "[NDBD]",
+                node_type_configini_header[node.type],
+                f"# {node.name()}",
                 f"HostName={node.private_ip}",
-                f"NodeId={next_node_id(node)}",
-                f"DataDir={RUN_DIR}/{node.type}/data",
-                f"FileSystemPath={RUN_DIR}/ndbmtd/ndb_data",
-                f"FileSystemPathDD={RUN_DIR}/ndbmtd/ndb_disk_columns",
+                f"NodeId={nodeid}",
                 f"LocationDomainId={node.idx % NUM_AZS}"
             ]
-        if node.type == "mysqld":
-            configini += [
-                "[MYSQLD]",
-                f"HostName={node.private_ip}",
-                f"NodeId={next_node_id(node)}",
-                f"LocationDomainId={node.idx % NUM_AZS}"
-            ]
-        if node.type == "rdrs":
-            for _ in range(NUM_CLUSTER_CONN_RDRS):
-                configini += [
-                    "[API]",
-                    "# RDRS",
-                    f"HostName={node.private_ip}",
-                    f"NodeId={next_node_id(node)}",
-                    f"LocationDomainId={node.idx % NUM_AZS}"
-                ]
-        if node.type == "bench":
-            for _ in range(NUM_CLUSTER_CONN_BENCH):
-                configini += [
-                    "[API]",
-                    "# BENCH",
-                    f"HostName={node.private_ip}",
-                    f"NodeId={next_node_id(node)}",
-                ]
     w("config_files/config.ini", *configini)
-    # Generate my.cnf (needs Node.ndb_nodeids)
+    # Generate my.cnf
     w("config_files/my.cnf",
         "[mysqld]",
         "ndbcluster",
@@ -211,7 +196,7 @@ def generate_config_files():
           f"NODEINFO_IDX={node.idx}",
           f"NODEINFO_NODEIDS=\"{' '.join(map(str, node.ndb_nodeids))}\"",
           )
-    # Generate rdrs_*.json (needs Node.ndb_nodeids)
+    # Generate rdrs_*.json
     for node in nodes_of_type("rdrs"):
         w(f"config_files/rdrs_{node.idx}.json",
           json.dumps({
@@ -479,7 +464,7 @@ def do_start_cluster(for_nodes):
     print("Before starting services, make sure they are stopped.")
     do_stop_cluster(for_nodes)
     print_uri = False
-    for start_type, _ in node_types:
+    for start_type, _, _ in node_types:
         if start_type == "bench": continue
         nodes_this_iteration = [n for n in for_nodes if n.type == start_type]
         count = len(nodes_this_iteration)
