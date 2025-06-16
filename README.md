@@ -66,30 +66,31 @@ This will
 
 ### `cluster_ctl` reference
 
-Some sub-commands take a `NODE_TYPE` argument.
-If given, the command will operate only on nodes of that node type, otherwise on all nodes.
+Some sub-commands take a `NODES` argument.
+It is a comma-separated list of node names and node types.
+If given, the command will operate only on matching nodes, otherwise on all nodes.
 Available node types are: `ndb_mgmd`, `ndbmtd`, `mysqld`, `rdrs`, `prometheus`, `grafana` and `bench`.
 
-* `./cluster_ctl deploy [NODE_TYPE]`
+* `./cluster_ctl deploy [NODES]`
     A convenience command equivalent to `install` followed by `start`.
 
-* `./cluster_ctl install [NODE_TYPE]`
+* `./cluster_ctl install [NODES]`
     Install necessary software and configuration files.
     Depending on the node type this may include RonDB, prometheus, grafana and locust.
 
-* `./cluster_ctl start [NODE_TYPE]`
+* `./cluster_ctl start [NODES]`
     Start or restart services.
     (This will not start locust, see `bench_locust`.)
 
-* `./cluster_ctl stop [NODE_TYPE]`
+* `./cluster_ctl stop [NODES]`
     Stop services.
 
-* `./cluster_ctl open_tmux [NODE_TYPE]`
+* `./cluster_ctl open_tmux [NODES]`
     Create a tmux session with ssh connections opened to all applicable nodes.
 
     When attached to the tmux session, you can press `C-b n` to go to the next window, and `C-b d` to detach.
 
-    If a session already exists, ignore the `NODE_TYPE` argument and reattach to it.
+    If a session already exists, ignore the `NODES` argument and reattach to it.
     To connect to a different set of nodes, use `kill_tmux` first.
 
     See also the `./cluster_ctl ssh` command.

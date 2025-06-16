@@ -614,28 +614,28 @@ if __name__ == "__main__":
     if argc < 2:
         print('\n'.join([
             "Usage:",
-            "  ./cluster_ctl deploy [NODE_TYPE]",
+            "  ./cluster_ctl deploy [NODES]",
             "    Install and start RonDB services.",
-            "      NODE_TYPE: See bottom.",
+            "      NODES: See bottom.",
             "",
-            "  ./cluster_ctl install [NODE_TYPE]",
+            "  ./cluster_ctl install [NODES]",
             "    Install RonDB services without starting. Called by deploy.",
-            "      NODE_TYPE: See bottom.",
+            "      NODES: See bottom.",
             "",
-            "  ./cluster_ctl start [NODE_TYPE]",
+            "  ./cluster_ctl start [NODES]",
             "    Start or restart RonDB services, without installing. Called by deploy.",
-            "      NODE_TYPE: See bottom.",
+            "      NODES: See bottom.",
             "",
-            "  ./cluster_ctl stop [NODE_TYPE]",
+            "  ./cluster_ctl stop [NODES]",
             "    Stop RonDB services. Called by start (and hence deploy).",
-            "      NODE_TYPE: See bottom.",
+            "      NODES: See bottom.",
             "",
-            "  ./cluster_ctl open_tmux [NODE_TYPE]",
+            "  ./cluster_ctl open_tmux [NODES]",
             "    Attach to a tmux session with ssh connections opened to all applicable",
-            "    nodes. If a session does not exist, it is created according to the NODE_TYPE",
+            "    nodes. If a session does not exist, it is created according to the NODES",
             "    parameter, otherwise the parameter is ignored. To connect to a different set",
             "    of nodes, use kill_tmux first.",
-            "      NODE_TYPE: See bottom.",
+            "      NODES: See bottom.",
             "",
             "  ./cluster_ctl kill_tmux",
             "    Kill the tmux session created by open_tmux.",
@@ -673,21 +673,28 @@ if __name__ == "__main__":
             "  ./cluster_ctl list",
             "    List node information.",
             "",
-            "NODE_TYPE: If given, operate only on nodes of that node type, otherwise on all",
-            "           nodes. Available node types are: ",
-            "           "+', '.join(node_type_names),
+            "NODES: A comma-separated list of node names and node types. If given, operate",
+            "       only on matching nodes, otherwise on all nodes. Available node types are:",
+            "       "+', '.join(node_type_names),
         ]))
         die("")
     action = sys.argv[1]
     if action in ["deploy", "install", "start", "stop", "open_tmux"]:
+        for_nodes = all_nodes()
         if argc == 2: pass
         elif argc == 3:
-            node_type = sys.argv[2]
-            if node_type not in node_type_names:
-                die(f"Unknown node type: {node_type}. Available types: " +
-                    ', '.join(node_type_names))
-        else: die(f"Usage: ./cluster_ctl {action} [NODE_TYPE]")
-        for_nodes = all_nodes() if argc == 2 else nodes_of_type(sys.argv[2])
+            for_nodes = []
+            for node_desc in sys.argv[2].split(","):
+                described_nodes = [node for node in all_nodes()
+                                   if node.name() == node_desc
+                                   or node.type == node_desc ]
+                if len(described_nodes) == 0:
+                    die(f"'{node_desc}' doesn't match any node name or type."
+                        " Try ./cluster_ctl list")
+                for_nodes += described_nodes
+            # Deduplicate and order
+            for_nodes = [node for node in all_nodes() if node in for_nodes ]
+        else: die(f"Usage: ./cluster_ctl {action} [NODES]")
         if action == "deploy": do_deploy(for_nodes)
         elif action == "install": do_install(for_nodes)
         elif action == "start": do_start_cluster(for_nodes)
