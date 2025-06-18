@@ -17,9 +17,6 @@ A minimal guide to get started.
   Run `aws configure` and enter it.
 3. Initialize and deploy the cluster
   ```
-  ./create_aws_ssh_key
-  terraform init
-  terraform apply
   ./cluster_ctl deploy
   ```
   Go to the printed web address to monitor the cluster using grafana dashboards.
@@ -27,42 +24,32 @@ A minimal guide to get started.
   Go to the printed web address to access locust.
 5. In the locust GUI, set the number of users to the same as the number of workers and press `START`.
   During the benchmark run, you can use both locust and grafana to gather statistics, from the client's and server's point of view, respectively.
-6. Run `./cleanup` to destroy the AWS resources and local files created.
+6. Run `./cluster_ctl cleanup` to destroy the AWS resources and local files created.
 
 ## Manual
 
 ### Cluster configuration
 
-A cluster can be (re)configured by changing the values in `terraform.tfvars`.
+A cluster can be (re)configured by changing the values in `config.py`.
 
-Before running `terraform init` and after running `./cleanup`, terraform is not initialized and you may edit `terraform.tfvars` freely.
+Before running `./cluster_ctl deploy` (or `./cluster_ctl terraform`) and after running `./cluster_ctl cleanup`, terraform is not initialized and you may edit `config.py` freely.
 Otherwise, follow these steps:
+* If you intend to change region, run `./cluster_ctl cleanup`.
+  This is because `region` cannot be updated for an existing cluster.
+* Edit `config.py`.
+* Apply the changes. The easiest way to do this is to run `./cluster_ctl deploy`.
 
-The necessary steps depend on what variables you've changed.
-* The `region` cannot be updated for an existing cluster.
-  If you want to use a different region, *first* run `./cleanup`, then edit `terraform.tfvars` and start over at *Simple usage* above, step 3.
-  The same goes for `key_name`, although there should be no reason to change that.
-* If you have changed variables that affect AWS resources, you must run `terraform apply`.
-  These include `num_azs`, `cpu_platform`, `*_instance_type` and `*_count`.
-  If you are unsure, run `terraform apply` anyways and it will exit quickly in case there are no changes.
-* Run `./cluster_ctl deploy` or `./cluster_ctl install`.
-  Technically it is enough to do so only for the affected node types.
-  However, this may include more types than you suppose.
-  For example, changing the number of `ndbmtd` nodes will affect the sequence of node IDs assigned to `mysqld`, `rdrs` and `bench` nodes, which will also affect the `ndb_mgmd` config.
-  It's easiest to run `./cluster_ctl deploy` without specifying a node type, to redeploy all.
-* The test data table is not retained across data node reinstallations or restarts.
+  If the cluster already existed, it might be possible to apply the changes faster, but it's more complex:
+  * If you have changed variables that affect AWS resources, you must run `./cluster_ctl terraform`.
+    These variables include `num_azs`, `cpu_platform`, `*_instance_type`, `*_disk_size` and `*_count`.
+  * Run `./cluster_ctl install` at least for affected nodes.
+    This may include more nodes than you suppose.
+    For example, changing `ndbmtd_count` will affect the sequence of node IDs assigned to `mysqld`, `rdrs` and `bench` nodes, and will also affect the `ndb_mgmd` config.
+  * Run `./cluster_ctl start` at least for affected nodes.
+* If all data nodes have been reinstalled or restarted, the test data table is lost.
   You'll have to repopulate using `./cluster_ctl bench_locust` or `./cluster_ctl populate`.
 * If you have run `./cluster_ctl deploy` or `./cluster_ctl start` on `bench` nodes, locust will be stopped but not started.
   You'll have to use `./cluster_ctl bench_locust` or `./cluster_ctl start_locust` for that.
-
-### Cleanup
-
-Cleanup is simple: just run `./cleanup`.
-This will
-* destroy the terraform cluster created by `terraform apply`
-* delete the AWS SSH key created by `./create_aws_ssh_key`
-* remove the tmux session created by `./cluster_ctl open_tmux`
-* delete temporary files
 
 ### `cluster_ctl` reference
 
@@ -72,7 +59,14 @@ If given, the command will operate only on matching nodes, otherwise on all node
 Available node types are: `ndb_mgmd`, `ndbmtd`, `mysqld`, `rdrs`, `prometheus`, `grafana` and `bench`.
 
 * `./cluster_ctl deploy [NODES]`
-    A convenience command equivalent to `install` followed by `start`.
+    A convenience command equivalent to `terraform`, `install` and `start`.
+
+* `./cluster_ctl terraform`
+    Configure, initialize and apply terraform as needed.
+    In detail,
+    * create or update `terraform.tfvars`.
+    * call `terraform init` unless it is already initialized.
+    * call `terraform apply`.
 
 * `./cluster_ctl install [NODES]`
     Install necessary software and configuration files.
@@ -129,3 +123,10 @@ Available node types are: `ndb_mgmd`, `ndbmtd`, `mysqld`, `rdrs`, `prometheus`, 
 
 * `./cluster_ctl list`
     Print node information, including node name, tyuupe, IPs and NDB Node IDs.
+
+* `./cluster_ctl cleanup`
+    This will
+    * destroy the terraform cluster created by `./cluster_ctl terraform`
+    * destroy the AWS SSH key created by `./cluster_ctl terraform`
+    * remove the tmux session created by `./cluster_ctl open_tmux`
+    * delete temporary files

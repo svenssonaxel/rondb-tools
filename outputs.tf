@@ -1,7 +1,3 @@
-output "key_name" {
-  value = var.key_name
-}
-
 output "ndb_mgmd_public_ips" {
   value = [for inst in aws_instance.ndb_mgmd : inst.public_ip]
 }
@@ -68,24 +64,4 @@ output "rdrs_nlb_dns" {
 
 output "rondis_nlb_dns" {
   value = aws_lb.rondis_nlb.dns_name
-}
-
-output "rondb_replicas" {
-  value = var.rondb_replicas
-}
-
-output "cpu_platform" {
-  value = var.cpu_platform
-}
-
-output "rondb_version" {
-  value = var.rondb_version
-}
-
-output "glibc_version" {
-  value = var.glibc_version
-}
-
-output "num_azs" {
-  value = var.num_azs
 }

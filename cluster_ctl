@@ -13,6 +13,37 @@ RUN_DIR = f"{WORKSPACE}/rondb-run"
 NUM_CLUSTER_CONN_MYSQLD=1
 NUM_CLUSTER_CONN_RDRS=2
 NUM_CLUSTER_CONN_BENCH=1
+config_required_strings = [
+    "bench_instance_type",
+    "cpu_platform",
+    "glibc_version",
+    "grafana_instance_type",
+    "mysqld_instance_type",
+    "ndb_mgmd_instance_type",
+    "ndbmtd_instance_type",
+    "prometheus_instance_type",
+    "rdrs_instance_type",
+    "region",
+    "rondb_version",
+]
+config_required_ints = [
+    "bench_count",
+    "bench_disk_size",
+    "mysqld_count",
+    "mysqld_disk_size",
+    "ndbmtd_count",
+    "ndbmtd_disk_size",
+    "num_azs",
+    "prometheus_disk_size",
+    "rdrs_count",
+    "rdrs_disk_size",
+    "rondb_replicas",
+]
+config_vars_not_in_tfvars = [
+    "rondb_replicas",
+    "rondb_version",
+    "glibc_version",
+]
 
 # Node types, number of NDB NodeIds, and color
 node_types = [
@@ -78,15 +109,66 @@ def first(node_type):
         if node.type == node_type:
             return node
     raise ValueError(f"No node of type {node_type} found")
+def nodes_from_expression(expr):
+    # expr is None for all nodes, or a comma-separated list of node names or
+    # node types.
+    if expr == None: return all_nodes()
+    ret = []
+    for node_desc in expr.split(","):
+        described_nodes = [node for node in all_nodes()
+                           if node.name() == node_desc
+                           or node.type == node_desc ]
+        if len(described_nodes) == 0:
+            die(f"'{node_desc}' doesn't match any node name or type."
+                " Try ./cluster_ctl list")
+        ret += described_nodes
+    # Deduplicate and order
+    ret = [node for node in all_nodes() if node in ret ]
+    return ret
+
+# Config
+@cache
+def config():
+    # Import config from ./config.py, validate and return
+    import config as config_module
+    c = config_module.config
+    for var in config_required_strings + config_required_ints:
+        if var not in c:
+            die(f"Config variable '{var}' not found in config.py.")
+        if var in config_required_strings and not (
+                isinstance(c[var], str) and c[var].strip()):
+            die(f"Config variable '{var}' must be a nonempty string in"
+                " config.py.")
+        if var in config_required_ints and not (
+                isinstance(c[var], int) and c[var] > 0):
+            die(f"Config variable '{var}' must be a positive integer in"
+                " config.py.")
+    if c['ndbmtd_count'] % c['rondb_replicas'] != 0:
+        die(f"Error: ndbmtd_count ({c['ndbmtd_count']}) must be divisible by"
+            " rondb_replicas ({c['rondb_replicas']}).")
+    if c['cpu_platform'] not in ['arm64_v8', 'x86_64']:
+        die(f"Error: cpu_platform must be either 'arm64_v8' or 'x86_64',"
+            f" but got '{c['cpu_platform']}' from config.py.")
+    for var in c:
+        if var not in config_required_strings + config_required_ints:
+            die(f"Unexpected variable '{var}' in config.py.")
+    return c
+def get_config(var_name):
+    c = config()
+    if var_name in c:
+        return c[var_name]
+    die(f"Error: config variable '{var_name}' not found.")
 
 # Terraform outputs
+has_read_tf_output = False
 @cache
 def tf_output():
+    global has_read_tf_output
     tf_output_file = Path("tf_output")
     state_file = Path("terraform.tfstate")
     if not state_file.exists():
         die("Error: terraform.tfstate does not exist."+
-            " Perhaps you forgot to run 'terraform apply'?")
+            " Perhaps you forgot to run './cluster_ctl terraform'?")
     if not (tf_output_file.exists() and
             state_file.exists() and
             state_file.stat().st_mtime < tf_output_file.stat().st_mtime):
@@ -94,6 +176,7 @@ def tf_output():
                               check=True, capture_output=True, text=True)
         if proc.returncode != 0:
             die(f"Error running terraform output: {proc.stdout + proc.stderr}")
+    has_read_tf_output = True
     return json.loads(tf_output_file.read_text())
 def get_tf_output(output_name):
     return tf_output()[output_name]['value']
@@ -106,11 +189,22 @@ def get_gui_secret():
         secret_file.write_text(secret)
     return secret_file.read_text().strip()
 
+@cache
+def get_unique_suffix():
+    us_file = Path("unique_suffix.txt")
+    if not us_file.exists():
+        us = os.urandom(8).hex()
+        us_file.write_text(us)
+    return us_file.read_text().strip()
+
+def get_key_name(): return f"rondb_bench_key_{get_unique_suffix()}"
+
+# Util functions
+def w(name, *content): Path(name).write_text("\n".join(content) + "\n")
+def mkdir(p): Path(p).mkdir(parents=True, exist_ok=True)
+
 # Generate ./config_files
 def generate_config_files():
-    # Util functions
-    def w(name, *content): Path(name).write_text("\n".join(content) + "\n")
-    def mkdir(p): Path(p).mkdir(parents=True, exist_ok=True)
     # Clean directory
     shutil.rmtree("config_files", ignore_errors=True)
     mkdir("config_files")
@@ -120,11 +214,11 @@ def generate_config_files():
     CONFIG_FILES=f"/home/{USER}/config_files"
     RUN_DIR=f"{WORKSPACE}/rondb-run"
     NDB_MGMD_PRI = first('ndb_mgmd').private_ip
-    NO_OF_REPLICAS = get_tf_output('rondb_replicas')
-    NUM_AZS = get_tf_output('num_azs')
-    RONDB_VERSION = get_tf_output('rondb_version')
-    GLIBC_VERSION = get_tf_output('glibc_version')
-    CPU_PLATFORM = get_tf_output('cpu_platform')
+    NO_OF_REPLICAS = get_config('rondb_replicas')
+    NUM_AZS = get_config('num_azs')
+    RONDB_VERSION = get_config('rondb_version')
+    GLIBC_VERSION = get_config('glibc_version')
+    CPU_PLATFORM = get_config('cpu_platform')
     TARBALL_NAME = f"rondb-{RONDB_VERSION}-linux-glibc{GLIBC_VERSION}-{CPU_PLATFORM}.tar.gz"
     # Generate shell_vars
     w("config_files/shell_vars",
@@ -424,7 +518,7 @@ def run_for_all(for_nodes, cmdfun):
     check_failed()
 def ssh_opts():
     return [
-        "-i", f"{get_tf_output('key_name')}.pem",
+        "-i", f"{get_key_name()}.pem",
         "-o", "StrictHostKeyChecking=no",
         "-q"]
 def ssh(node, cmd=""):
@@ -433,6 +527,48 @@ def ssh(node, cmd=""):
 def rsync(file, node):
     return ["rsync", "-az", "--delete", "-e", f"ssh {' '.join(ssh_opts())}",
             file, f"{USER}@{node.public_ip}:"]
+
+# deploy command
+def do_deploy(expr):
+    do_terraform()
+    for_nodes = nodes_from_expression(expr)
+    do_install(for_nodes)
+    do_start_cluster(for_nodes)
+
+# terraform command
+def do_terraform():
+    if has_read_tf_output:
+        die("Bug: Called do_terraform() after tf_output()")
+    # Generate ./terraform.tfvars
+    w("terraform.tfvars",
+      *[f'{var}="{get_config(var)}"' for var in config_required_strings
+        if var not in config_vars_not_in_tfvars],
+      *[f'{var}={get_config(var)}' for var in config_required_ints
+        if var not in config_vars_not_in_tfvars],
+      f'key_name="{get_key_name()}"',
+      f'unique_suffix="{get_unique_suffix()}"',
+      )
+    # Create AWS SSH key pair and save to a .pem file, unless it already exists.
+    key_name=get_key_name()
+    key_file=Path(f"{key_name}.pem")
+    if not key_file.exists():
+        print(f"Creating key pair {key_name}...")
+        subprocess.run(f"aws ec2 create-key-pair --key-name {key_name}"
+                       f" --key-type ed25519 --region {get_config('region')}"
+                       f" --query KeyMaterial --output text > {key_name}.pem",
+                       shell=True, check=True)
+        key_file.chmod(0o600)
+    if not key_file.exists() or key_file.stat().st_size == 0:
+        die("Failed to create key pair.")
+    # Initialize terraform if necessary
+    if not Path(".terraform").exists():
+        print("Running terraform init...")
+        if subprocess.run(["terraform", "init"]).returncode != 0:
+            die("'terraform init' failed.")
+        print("Terraform initialized successfully.")
+    # terraform apply
+    if subprocess.run(["terraform", "apply"]).returncode != 0:
+        die("'terraform apply' failed.")
 
 # install command
 def do_install(for_nodes):
@@ -483,11 +619,6 @@ def do_start_cluster(for_nodes):
                 f"/{get_gui_secret()}/d/rdrs")
         print(f'Go to {uri} in your browser to see the dashboard.')
 
-# deploy command
-def do_deploy(for_nodes):
-    do_install(for_nodes)
-    do_start_cluster(for_nodes)
-
 # stop command
 def do_stop_cluster(for_nodes):
     run_for_all(for_nodes, lambda node: [
@@ -496,10 +627,12 @@ def do_stop_cluster(for_nodes):
 
 # open_tmux command
 def do_open_tmux(for_nodes):
+    if not shutil.which("tmux"):
+        die("tmux is not installed.")
     def tmux(*args, check=True, **kwargs):
         cmd = ["tmux", *args]
         return subprocess.run(cmd, check=check, **kwargs).returncode == 0
-    session_name = "rondb_bm"
+    session_name = f"rondb_bm {get_unique_suffix()}"
     if not tmux("has-session", "-t", session_name, capture_output=True, check=False):
         tmux("new-session", "-d", "-s", session_name)
         for node in for_nodes:
@@ -523,12 +656,20 @@ def do_ssh(nodename, *cmd):
 
 # kill_tmux command
 def do_kill_tmux():
-    def tmux(*args, check=True, **kwargs):
-        cmd = ["tmux", *args]
-        return subprocess.run(cmd, check=check, **kwargs).returncode == 0
-    session_name = "rondb_bm"
-    if tmux("has-session", "-t", session_name, capture_output=True, check=False):
-        tmux("kill-session", "-t", session_name)
+    if not shutil.which("tmux"):
+        die("tmux is not installed.")
+    if not Path("unique_suffix.txt").exists():
+        # Avoid creating unique_suffix.txt unnecessarily.
+        print("No tmux session to delete.")
+        return
+    session_name = f"rondb_bm {get_unique_suffix()}"
+    if subprocess.run(["tmux", "has-session", "-t", session_name],
+                      capture_output=True).returncode != 0:
+        print("No tmux session to delete.")
+        return
+    print(f"Deleting tmux session '{session_name}'.")
+    subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
+    print("Done deleting tmux session.")
 
 # bench locust command
 def do_bench_locust(columns, rows, column_types, total_workers):
@@ -607,6 +748,39 @@ def do_list():
               node.private_ip.ljust(15) + ' ' +
               ', '.join(map(str, node.ndb_nodeids)))
 
+# cleanup command
+def do_cleanup():
+    # Destroy terraform cluster if it exists
+    state_file = Path("terraform.tfstate")
+    if state_file.exists():
+        print("Destroying terraform cluster.")
+        if subprocess.run(["terraform", "destroy"]).returncode != 0:
+            die("'terraform destroy' failed.")
+        print("Done destroying terraform cluster.")
+    else:
+        print("Skip 'terraform destroy' since there is no terraform.tfstate"
+              " file.")
+    # Destroy AWS SSH key pair if it exists
+    key_name=get_key_name()
+    key_file=Path(f"{key_name}.pem")
+    if key_file.exists():
+        print("Deleting AWS SSH key.")
+        subprocess.run(["aws", "ec2", "delete-key-pair",
+                        "--key-name", key_name,
+                        "--region", get_config('region')],
+                       check=True)
+        key_file.unlink()
+        print("Done deleting AWS SSH key.")
+    else:
+        print("No AWS SSH key to delete.")
+    if shutil.which("tmux"):
+        do_kill_tmux()
+    print("Deleting temporary files.")
+    subprocess.run("rm -rf .terraform* terraform.* tf_output config_files"
+                   " __pycache__ gui_secret.txt unique_suffix.txt",
+                   shell=True, check=True)
+    print("Done deleting temporary files.")
+
 # CLI
 if __name__ == "__main__":
     argc = len(sys.argv)
@@ -615,8 +789,12 @@ if __name__ == "__main__":
         print('\n'.join([
             "Usage:",
             "  ./cluster_ctl deploy [NODES]",
-            "    Install and start RonDB services.",
+            "    Configure, initialize and apply terraform, as needed. Then install and start",
+            "    RonDB services.",
             "      NODES: See bottom.",
+            "",
+            "  ./cluster_ctl terraform",
+            "    Configure, initialize and apply terraform, as needed.",
             "",
             "  ./cluster_ctl install [NODES]",
             "    Install RonDB services without starting. Called by deploy.",
@@ -673,6 +851,9 @@ if __name__ == "__main__":
             "  ./cluster_ctl list",
             "    List node information.",
             "",
+            "  ./cluster_ctl cleanup",
+            "    Destroy AWS resources and delete temporary files and tmux session.",
+            "",
             "NODES: A comma-separated list of node names and node types. If given, operate",
             "       only on matching nodes, otherwise on all nodes. Available node types are:",
             "       "+', '.join(node_type_names),
@@ -680,37 +861,30 @@ if __name__ == "__main__":
         die("")
     action = sys.argv[1]
     if action in ["deploy", "install", "start", "stop", "open_tmux"]:
-        for_nodes = all_nodes()
+        arg = None
         if argc == 2: pass
         elif argc == 3:
-            for_nodes = []
-            for node_desc in sys.argv[2].split(","):
-                described_nodes = [node for node in all_nodes()
-                                   if node.name() == node_desc
-                                   or node.type == node_desc ]
-                if len(described_nodes) == 0:
-                    die(f"'{node_desc}' doesn't match any node name or type."
-                        " Try ./cluster_ctl list")
-                for_nodes += described_nodes
-            # Deduplicate and order
-            for_nodes = [node for node in all_nodes() if node in for_nodes ]
+            arg = sys.argv[2]
         else: die(f"Usage: ./cluster_ctl {action} [NODES]")
-        if action == "deploy": do_deploy(for_nodes)
-        elif action == "install": do_install(for_nodes)
-        elif action == "start": do_start_cluster(for_nodes)
-        elif action == "stop": do_stop_cluster(for_nodes)
-        elif action == "open_tmux": do_open_tmux(for_nodes)
+        if action != "deploy": arg = nodes_from_expression(arg)
+        if action == "deploy": do_deploy(arg)
+        elif action == "install": do_install(arg)
+        elif action == "start": do_start_cluster(arg)
+        elif action == "stop": do_stop_cluster(arg)
+        elif action == "open_tmux": do_open_tmux(arg)
         else: die("Bug")
     elif action == "ssh":
         if argc < 3:
             die("Usage: ./cluster_ctl ssh NODE_NAME [COMMAND ...]")
         do_ssh(*sys.argv[2:])
-    elif action in ["kill_tmux", "stop_locust", "list"]:
+    elif action in ["terraform", "kill_tmux", "stop_locust", "list", "cleanup"]:
         if argc != 2:
             die(f"Usage: ./cluster_ctl {action}")
-        if action == "kill_tmux": do_kill_tmux()
+        if action == "terraform": do_terraform()
+        elif action == "kill_tmux": do_kill_tmux()
         elif action == "stop_locust": do_stop_locust()
         elif action == "list": do_list()
+        elif action == "cleanup": do_cleanup()
         else: die("Bug")
     elif action in ["bench_locust", "populate", "start_locust"]:
         columns = 100

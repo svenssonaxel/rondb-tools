@@ -2,18 +2,6 @@ variable "region" {
   default = "eu-north-1"
 }
 
-variable "rondb_replicas" {
-  default = 2
-}
-
-variable "rondb_version" {
-  default = "24.10.1"
-}
-
-variable "glibc_version" {
-  default = "2.28"
-}
-
 variable "cpu_platform" {
   default = "x86_64"
   description = "CPU platform (x86_64 or arm64_v8)"
@@ -30,6 +18,10 @@ variable "num_azs" {
 
 variable "key_name" {
   default = "rondb_bench_key"
+}
+
+variable "unique_suffix" {
+  default = "123"
 }
 
 variable "ndb_mgmd_instance_type" {
