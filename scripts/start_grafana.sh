@@ -8,6 +8,6 @@ before-start grafana
 after-start grafana
 before-start nginx
 (set -x
- nginx -c ${CONFIG_FILES}/nginx_grafana.conf
+ nginx -c ${CONFIG_FILES}/nginx_grafana.conf 2>/dev/null
 )
 after-start nginx

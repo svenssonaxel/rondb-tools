@@ -132,7 +132,7 @@ resource "aws_instance" "ndbmtd" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "ndbmtd_${count.index + 1}-${var.unique_suffix}"
+    Name = "ndbmtd_${count.index}-${var.unique_suffix}"
   }
 }
 
@@ -149,7 +149,7 @@ resource "aws_instance" "mysqld" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "mysqld_${count.index + 1}-${var.unique_suffix}"
+    Name = "mysqld_${count.index}-${var.unique_suffix}"
   }
 }
 
@@ -166,7 +166,7 @@ resource "aws_instance" "rdrs" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "rdrs_${count.index + 1}-${var.unique_suffix}"
+    Name = "rdrs_${count.index}-${var.unique_suffix}"
   }
 }
 
@@ -217,7 +217,7 @@ resource "aws_instance" "bench" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "bench_${count.index + 1}-${var.unique_suffix}"
+    Name = "bench_${count.index}-${var.unique_suffix}"
   }
 }
 

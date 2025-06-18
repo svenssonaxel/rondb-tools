@@ -13,18 +13,20 @@ case "$NODEINFO_ROLE" in
 esac
 
 # 2. Install RonDB
-TARBALL=${TARBALL_NAME%%.tar.gz}
+TARBALL_EXTRACTED_DIR=/tmp/${TARBALL_NAME%%.tar.gz}
 
 if need_rondb; then
   rm -rf ${WORKSPACE}
   mkdir -p ${WORKSPACE}
   cd ${WORKSPACE}
-  tar xzf /tmp/${TARBALL_NAME}
-  ln -s ${TARBALL} rondb
+  ln -s ${TARBALL_EXTRACTED_DIR} rondb
 fi
 
+sudo sysctl -w kernel.core_pattern=core.%e.%p
+
 # Install prometheus exporter for OS metrics on all nodes
-sudo apt-get install -y prometheus-node-exporter
+(set -x
+ sudo apt-get install -yq prometheus-node-exporter)
 
 # 4. Install services and create directories
 case "$NODEINFO_ROLE" in
@@ -42,36 +44,42 @@ case "$NODEINFO_ROLE" in
   mysqld)
     rm -rf ${RUN_DIR}
     mkdir -p ${RUN_DIR}/mysqld/data
-    sudo apt-get install -y golang
+    (set -x
+     sudo apt-get install -yq golang)
     cd ${WORKSPACE}
     git clone https://github.com/logicalclocks/mysqld_exporter.git
     cd mysqld_exporter
-    git checkout origin/ndb
+    (set -x
+     git checkout -q origin/ndb)
     go build
     ;;
   rdrs)
     rm -rf ${RUN_DIR}
     mkdir -p ${RUN_DIR}/rdrs
-    sudo apt-get install -y libjsoncpp-dev
+    (set -x
+     sudo apt-get install -yq libjsoncpp-dev)
     ;;
   prometheus)
     rm -rf ${RUN_DIR}
     mkdir -p ${RUN_DIR}/prometheus
     sudo systemctl mask prometheus
-    sudo apt-get install -y prometheus
+    (set -x
+     sudo apt-get install -yq prometheus)
     ;;
   grafana)
     rm -rf ${RUN_DIR}
     mkdir -p ${RUN_DIR}/grafana ${RUN_DIR}/nginx
     sudo systemctl mask nginx
-    sudo DEBIAN_FRONTEND=noninteractive \
-         apt-get install -y software-properties-common nginx
+    (set -x
+     sudo DEBIAN_FRONTEND=noninteractive \
+          apt-get install -yq software-properties-common nginx)
     sudo mkdir -p /etc/apt/keyrings
     curl -fsSL https://packages.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
     echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://packages.grafana.com/oss/deb stable main" | \
       sudo tee /etc/apt/sources.list.d/grafana.list
-    sudo apt-get update -y
-    sudo apt-get install -y grafana
+    (set -x
+     sudo apt-get update -yq
+     sudo apt-get install -yq grafana)
     ;;
   bench)
     rm -rf ${RUN_DIR}

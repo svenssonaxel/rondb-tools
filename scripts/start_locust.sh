@@ -37,6 +37,6 @@ fi
 after-start locust
 before-start nginx
 (set -x
- nginx -c ${CONFIG_FILES}/nginx_locust.conf
+ nginx -c ${CONFIG_FILES}/nginx_locust.conf 2>/dev/null
 )
 after-start nginx

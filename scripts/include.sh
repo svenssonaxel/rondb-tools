@@ -1,4 +1,5 @@
 set -euo pipefail
+ulimit -c unlimited
 
 source ./config_files/shell_vars
 source ./config_files/nodeinfo

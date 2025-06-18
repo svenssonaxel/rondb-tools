@@ -2,8 +2,6 @@
 
 import json, math, os, shutil, subprocess, sys, threading, time
 from pathlib import Path
-from queue import Queue, Empty
-from string import Template
 from functools import cache
 
 # Constants
@@ -172,8 +170,7 @@ def tf_output():
     if not (tf_output_file.exists() and
             state_file.exists() and
             state_file.stat().st_mtime < tf_output_file.stat().st_mtime):
-        proc = subprocess.run("terraform output -json > tf_output", shell=True,
-                              check=True, capture_output=True, text=True)
+        proc = subprocess.run("terraform output -json > tf_output", shell=True)
         if proc.returncode != 0:
             die(f"Error running terraform output: {proc.stdout + proc.stderr}")
     has_read_tf_output = True
@@ -268,7 +265,7 @@ def generate_config_files():
                 f"# {node.name()}",
                 f"HostName={node.private_ip}",
                 f"NodeId={nodeid}",
-                f"LocationDomainId={node.idx % NUM_AZS}"
+                f"LocationDomainId={(node.idx % NUM_AZS) + 1}"
             ]
     w("config_files/config.ini", *configini)
     # Generate my.cnf
@@ -671,7 +668,7 @@ def do_kill_tmux():
     subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
     print("Done deleting tmux session.")
 
-# bench locust command
+# bench_locust command
 def do_bench_locust(columns, rows, column_types, total_workers):
     do_start_locust(rows, total_workers, only_validate=True)
     do_populate(columns, rows, column_types)
@@ -695,7 +692,7 @@ def do_populate(columns, rows, column_types):
             f" {batch_size} {column_info}")
     ])
 
-# start locust command
+# start_locust command
 def do_start_locust(rows, total_workers, only_validate=False):
     # Validate parameters
     if rows < 1 or 1000000000 < rows:
@@ -729,7 +726,7 @@ def do_start_locust(rows, total_workers, only_validate=False):
 # stop_locust command
 def do_stop_locust():
     run_for_all(nodes_of_type("bench"), lambda node: [
-        ssh(node, "bash ~/scripts/stop_locust.sh")
+        ssh(node, "source ~/scripts/include.sh && stop locust")
     ])
 
 # list command
@@ -825,7 +822,7 @@ if __name__ == "__main__":
             "                             [--types COLUMN_TYPES] [--workers WORKERS]",
             "    Populate a table with test data and start locust ready to run a benchmark",
             "    against it.",
-            "      COLUMNS: Number of columns in table. Default 100.",
+            "      COLUMNS: Number of columns in table. Default 10.",
             "      ROWS: Number of rows in table. Default 100000.",
             "      COLUMN_TYPES: The columns types in table; one of INT, VARCHAR,",
             "                    INT_AND_VARCHAR. Default INT.",
@@ -833,7 +830,7 @@ if __name__ == "__main__":
             "",
             "  ./cluster_ctl populate [--cols COLUMNS] [--rows ROWS] [--types COLUMN_TYPES]",
             "    Populate a table with test data. Called by bench_locust.",
-            "      COLUMNS: Number of columns in table. Default 100.",
+            "      COLUMNS: Number of columns in table. Default 10.",
             "      ROWS: Number of rows in table. Default 100000.",
             "      COLUMN_TYPES: The columns types in table; one of INT, VARCHAR,",
             "                    INT_AND_VARCHAR. Default INT.",
@@ -887,7 +884,7 @@ if __name__ == "__main__":
         elif action == "cleanup": do_cleanup()
         else: die("Bug")
     elif action in ["bench_locust", "populate", "start_locust"]:
-        columns = 100
+        columns = 10
         rows = 100000
         column_types = "INT"
         total_workers = None

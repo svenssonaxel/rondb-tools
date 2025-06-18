@@ -1,6 +1,6 @@
 # RonDB Tools
 
-This tool lets you deploy a RonDB clusters on AWS, monitor the cluster and run benchmarks.
+This tool lets you deploy a RonDB cluster on AWS, monitor the cluster and run benchmarks.
 
 ## Simple usage
 
@@ -9,17 +9,14 @@ A minimal guide to get started.
 1. The easiest way to get all necessary dependencies is to install `nix` and run `nix-shell`.
   You'll get a bash session with access to the dependencies, without modifying your system directories.
   Otherwise:
-    * Install terraform, see https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli
+    * [Install terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
     * Install AWS CLI, python3, rsync and tmux.
       * On Debian/Ubuntu: `apt-get update && apt-get install -y awscli python3 rsync tmux`
       * On macOS: `brew install awscli python3 rsync tmux`
 2. You need an AWS API key to create cloud resources.
   Run `aws configure` and enter it.
-3. Initialize and deploy the cluster
-  ```
-  ./cluster_ctl deploy
-  ```
-  Go to the printed web address to monitor the cluster using grafana dashboards.
+3. Run `./cluster_ctl deploy` to initialize and deploy the cluster.
+   Go to the printed web address to monitor the cluster using grafana dashboards.
 4. Run `./cluster_ctl bench_locust` to create test data and start locust.
   Go to the printed web address to access locust.
 5. In the locust GUI, set the number of users to the same as the number of workers and press `START`.
@@ -105,7 +102,7 @@ Available node types are: `ndb_mgmd`, `ndbmtd`, `mysqld`, `rdrs`, `prometheus`, 
     Create and populate a table with test data.
     If a table already exists, recreate it if any parameter has changed, otherwise do nothing.
     Parameters:
-    * `COLUMNS`: Number of columns in table. Default 100.
+    * `COLUMNS`: Number of columns in table. Default 10.
     * `ROWS`: Number of rows in table. Default 100000.
     * `COLUMN_TYPES`: The columns types in table; one of `INT`, `VARCHAR`, `INT_AND_VARCHAR`. Default `INT`.
 

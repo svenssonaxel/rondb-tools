@@ -1,5 +1,6 @@
 *.pem
 .terraform*
+__pycache__
 config_files/
 gui_secret.txt
 terraform.*
