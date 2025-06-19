@@ -45,13 +45,13 @@ config_vars_not_in_tfvars = [
 
 # Node types, number of NDB NodeIds, and color
 node_types = [
-    ("ndb_mgmd",   1,                       "48;2;0;120;0;38;5;255"),
-    ("ndbmtd",     1,                       "48;2;0;214;0;38;5;16"),
-    ("mysqld",     NUM_CLUSTER_CONN_MYSQLD, "48;2;104;62;254;38;5;255"),
-    ("rdrs",       NUM_CLUSTER_CONN_RDRS,   "48;2;200;169;254;38;5;16"),
-    ("prometheus", 0,                       "48;2;184;0;184;38;5;255"),
-    ("grafana",    0,                       "48;2;254;144;249;38;5;16"),
-    ("bench",      NUM_CLUSTER_CONN_BENCH,  "48;2;190;190;0;38;5;16"),
+    ("ndb_mgmd",   1,                       "48;2;21;149;230;38;5;16"),
+    ("ndbmtd",     1,                       "48;2;3;193;148;38;5;16"),
+    ("mysqld",     NUM_CLUSTER_CONN_MYSQLD, "48;2;255;227;71;38;5;16"),
+    ("rdrs",       NUM_CLUSTER_CONN_RDRS,   "48;2;233;125;103;38;5;16"),
+    ("prometheus", 0,                       "48;2;178;141;248;38;5;16"),
+    ("grafana",    0,                       "48;2;239;161;248;38;5;16"),
+    ("bench",      NUM_CLUSTER_CONN_BENCH,  "48;2;255;178;75;38;5;16"),
 ]
 import sys
 stdout_is_tty=sys.stdout.isatty()
