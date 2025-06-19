@@ -119,7 +119,7 @@ Available node types are: `ndb_mgmd`, `ndbmtd`, `mysqld`, `rdrs`, `prometheus`, 
     Stop locust.
 
 * `./cluster_ctl list`
-    Print node information, including node name, tyuupe, IPs and NDB Node IDs.
+    Print node information, including node name, node type, public and private IP, NDB Node IDs, and running processes.
 
 * `./cluster_ctl cleanup`
     This will

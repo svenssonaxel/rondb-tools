@@ -7,6 +7,8 @@ source ./config_files/nodeinfo
 bin="${WORKSPACE}/rondb/bin"
 mysql="$bin/mysql -uroot"
 
+possible_procs="ndb_mgmd ndbmtd mysqld mysqld_exporter rdrs2 prometheus grafana grafana-server sysbench locust valkey nginx"
+
 is-running() {
   # linux process names are max 15 characters.
   pgrep -x "${1:0:15}" >/dev/null
