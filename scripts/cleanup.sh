@@ -2,20 +2,7 @@
 source ./scripts/include.sh
 
 #1. Stop servers
-for proc in \
-  ndb_mgmd \
-  ndbmtd \
-  mysqld \
-  mysqld_exporter \
-  rdrs2 \
-  prometheus \
-  grafana \
-  grafana-server \
-  nginx \
-  sysbench \
-  locust \
-  valkey \
-  ;
+for proc in $possible_procs;
 do stop $proc; done
 
 #2. cleanup directories

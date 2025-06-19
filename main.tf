@@ -48,7 +48,7 @@ resource "aws_route_table_association" "rt" {
 }
 
 resource "aws_security_group" "rondb_bench" {
-  name        = "rondb_bench"
+  name        = "rondb_bench-${var.unique_suffix}"
   description = "Expose ssh, grafana and locust"
   vpc_id      = aws_vpc.main.id
 
@@ -115,7 +115,7 @@ resource "aws_instance" "ndb_mgmd" {
   vpc_security_group_ids = [aws_security_group.rondb_bench.id]
   key_name               = var.key_name
   tags = {
-    Name = "ndb_mgmd"
+    Name = "ndb_mgmd-${var.unique_suffix}"
   }
 }
 
@@ -132,7 +132,7 @@ resource "aws_instance" "ndbmtd" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "ndbmtd_${count.index + 1}"
+    Name = "ndbmtd_${count.index}-${var.unique_suffix}"
   }
 }
 
@@ -149,7 +149,7 @@ resource "aws_instance" "mysqld" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "mysqld_${count.index + 1}"
+    Name = "mysqld_${count.index}-${var.unique_suffix}"
   }
 }
 
@@ -166,7 +166,7 @@ resource "aws_instance" "rdrs" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "rdrs_${count.index + 1}"
+    Name = "rdrs_${count.index}-${var.unique_suffix}"
   }
 }
 
@@ -183,7 +183,7 @@ resource "aws_instance" "prometheus" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "prometheus"
+    Name = "prometheus-${var.unique_suffix}"
   }
 }
 
@@ -196,7 +196,7 @@ resource "aws_instance" "grafana" {
   vpc_security_group_ids = [aws_security_group.rondb_bench.id]
   key_name               = var.key_name
   tags = {
-    Name = "grafana"
+    Name = "grafana-${var.unique_suffix}"
   }
 }
 
@@ -217,19 +217,19 @@ resource "aws_instance" "bench" {
     volume_type = "gp3"
   }
   tags = {
-    Name = "bench_${count.index + 1}"
+    Name = "bench_${count.index}-${var.unique_suffix}"
   }
 }
 
 resource "aws_lb" "rdrs_nlb" {
-  name               = "rdrs-lbs"
+  name               = "rdrs-lbs-${var.unique_suffix}"
   internal           = true
   load_balancer_type = "network"
   subnets            = local.selected_subnets
 }
 
 resource "aws_lb_target_group" "rdrs_tg" {
-  name        = "rdrs-targets"
+  name        = "rdrs-targets-${var.unique_suffix}"
   port        = 4406
   protocol    = "TCP"
   vpc_id      = aws_vpc.main.id
@@ -255,14 +255,14 @@ resource "aws_lb_listener" "rdrs_listener" {
 }
 
 resource "aws_lb" "rondis_nlb" {
-  name               = "rondis-lbs"
+  name               = "rondis-lbs-${var.unique_suffix}"
   internal           = true
   load_balancer_type = "network"
   subnets            = local.selected_subnets
 }
 
 resource "aws_lb_target_group" "rondis_tg" {
-  name        = "rondis-targets"
+  name        = "rondis-targets-${var.unique_suffix}"
   port        = 6379
   protocol    = "TCP"
   vpc_id      = aws_vpc.main.id

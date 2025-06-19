@@ -1,9 +1,8 @@
 *.pem
-.terraform.lock.hcl
-.terraform.tfstate.lock.info
-.terraform/
+.terraform*
+__pycache__
 config_files/
 gui_secret.txt
-terraform.tfstate
-terraform.tfstate.backup
+terraform.*
 tf_output
+unique_suffix.txt
